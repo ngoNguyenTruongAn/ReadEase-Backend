@@ -1,8 +1,11 @@
 const { Module } = require('@nestjs/common');
+const { APP_INTERCEPTOR } = require('@nestjs/core');
 const { ConfigModule } = require('@nestjs/config');
 const { AppController } = require('./app.controller');
 const { AppService } = require('./app.service');
 const { configModules, validationSchema, validationOptions } = require('./config');
+const { LoggingInterceptor } = require('./common/interceptors/logging.interceptor');
+const { requestIdMiddleware } = require('./common/middleware/request-id.middleware');
 
 /** @type {import('@nestjs/common').ModuleMetadata} */
 const metadata = {
@@ -16,10 +19,24 @@ const metadata = {
     }),
   ],
   controllers: [AppController],
-  providers: [AppService],
+  providers: [
+    AppService,
+    {
+      provide: APP_INTERCEPTOR,
+      useClass: LoggingInterceptor,
+    },
+  ],
 };
 
-class AppModule {}
+class AppModule {
+  /**
+   * Apply request-id middleware to all routes
+   * @param {MiddlewareConsumer} consumer
+   */
+  configure(consumer) {
+    consumer.apply(requestIdMiddleware).forRoutes('*');
+  }
+}
 
 Reflect.decorate([Module(metadata)], AppModule);
 
