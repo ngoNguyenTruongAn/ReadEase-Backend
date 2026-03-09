@@ -1,0 +1,56 @@
+version: '3.8'
+
+services:
+  # 1. Cơ sở dữ liệu PostgreSQL
+  postgres:
+    image: postgres:15-alpine
+    container_name: readease_db
+    restart: always
+    environment:
+      POSTGRES_USER: ${POSTGRES_USER}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD}
+      POSTGRES_DB: ${POSTGRES_DB}
+    ports:
+      - "5432:5432"
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+
+  # 2. Redis Cache (Bộ đệm cho tọa độ chuột)
+  redis:
+    image: redis:7-alpine
+    container_name: readease_redis
+    restart: always
+    ports:
+      - "6379:6379"
+
+  # 3. Backend NestJS
+  backend:
+    build: 
+      context: ./backend
+      dockerfile: Dockerfile.dev
+    container_name: readease_backend
+    volumes:
+      - ./backend:/usr/src/app
+      - /usr/src/app/node_modules
+    ports:
+      - "${BACKEND_PORT}:3000"
+    depends_on:
+      - postgres
+      - redis
+    environment:
+      - DB_HOST=postgres
+      - REDIS_HOST=redis
+
+  # 4. Machine Learning Service (Python)
+  ml-service:
+    build:
+      context: ./ml-service
+      dockerfile: Dockerfile.dev
+    container_name: readease_ml
+    volumes:
+      - ./ml-service:/app
+    ports:
+      - "${ML_SERVICE_PORT}:8000"
+
+volumes:
+  postgres_data:
