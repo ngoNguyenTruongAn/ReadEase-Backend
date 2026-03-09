@@ -1,56 +1,119 @@
-version: '3.8'
-
 services:
-  # 1. Cơ sở dữ liệu PostgreSQL
-  postgres:
-    image: postgres:15-alpine
-    container_name: readease_db
-    restart: always
-    environment:
-      POSTGRES_USER: ${POSTGRES_USER}
-      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD}
-      POSTGRES_DB: ${POSTGRES_DB}
+  # ──────────────────────────────────────────────
+  # 1. NestJS Backend API (JavaScript)
+  # ──────────────────────────────────────────────
+  api:
+    build:
+      context: ./backend
+      dockerfile: Dockerfile.dev
+    container_name: readease_api
+    restart: unless-stopped
     ports:
-      - "5432:5432"
+      - "${APP_PORT:-3000}:3000"
+    environment:
+      - NODE_ENV=${APP_ENV:-development}
+      - APP_PORT=3000
+      - APP_ENV=${APP_ENV:-development}
+      - LOG_LEVEL=${LOG_LEVEL:-debug}
+      - DB_HOST=postgres
+      - DB_PORT=5432
+      - DB_NAME=${POSTGRES_DB:-readease}
+      - DB_USER=${POSTGRES_USER:-readease_app}
+      - DB_PASSWORD=${POSTGRES_PASSWORD:-devpassword}
+      - REDIS_HOST=redis
+      - REDIS_PORT=6379
+      - JWT_SECRET=${JWT_SECRET:-dev-jwt-secret-change-in-production}
+      - JWT_ACCESS_TTL=${JWT_ACCESS_TTL:-900}
+      - JWT_REFRESH_TTL=${JWT_REFRESH_TTL:-604800}
+      - ML_ENGINE_URL=http://ml-engine:8000
+      - ML_TIMEOUT_MS=${ML_TIMEOUT_MS:-5000}
+      - GEMINI_API_KEY=${GEMINI_API_KEY:-}
+      - GEMINI_MODEL=${GEMINI_MODEL:-gemini-2.0-flash}
     volumes:
-      - postgres_data:/var/lib/postgresql/data
+      - ./backend/src:/app/src
+      - ./backend/test:/app/test
+    depends_on:
+      postgres:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+    networks:
+      - readease-network
 
-  # 2. Redis Cache (Bộ đệm cho tọa độ chuột)
+  # ──────────────────────────────────────────────
+  # 2. PostgreSQL 16 Database
+  # ──────────────────────────────────────────────
+  postgres:
+    image: postgres:16-alpine
+    container_name: readease_db
+    restart: unless-stopped
+    environment:
+      POSTGRES_DB: ${POSTGRES_DB:-readease}
+      POSTGRES_USER: ${POSTGRES_USER:-readease_app}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-devpassword}
+    ports:
+      - "${DB_PORT:-5432}:5432"
+    volumes:
+      - pgdata:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U ${POSTGRES_USER:-readease_app} -d ${POSTGRES_DB:-readease}"]
+      interval: 5s
+      timeout: 5s
+      retries: 5
+      start_period: 10s
+    networks:
+      - readease-network
+
+  # ──────────────────────────────────────────────
+  # 3. Redis 7 Cache (WebSocket buffer, lexical cache)
+  # ──────────────────────────────────────────────
   redis:
     image: redis:7-alpine
     container_name: readease_redis
-    restart: always
+    restart: unless-stopped
     ports:
-      - "6379:6379"
-
-  # 3. Backend NestJS
-  backend:
-    build: 
-      context: ./backend
-      dockerfile: Dockerfile.dev
-    container_name: readease_backend
+      - "${REDIS_PORT:-6379}:6379"
     volumes:
-      - ./backend:/usr/src/app
-      - /usr/src/app/node_modules
-    ports:
-      - "${BACKEND_PORT}:3000"
-    depends_on:
-      - postgres
-      - redis
-    environment:
-      - DB_HOST=postgres
-      - REDIS_HOST=redis
+      - redisdata:/data
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 5s
+      timeout: 3s
+      retries: 5
+      start_period: 5s
+    networks:
+      - readease-network
 
-  # 4. Machine Learning Service (Python)
-  ml-service:
+  # ──────────────────────────────────────────────
+  # 4. ML Engine — Python FastAPI (Cognitive State Classifier)
+  # ──────────────────────────────────────────────
+  ml-engine:
     build:
       context: ./ml-service
       dockerfile: Dockerfile.dev
     container_name: readease_ml
+    restart: unless-stopped
+    ports:
+      - "${ML_SERVICE_PORT:-8000}:8000"
     volumes:
       - ./ml-service:/app
-    ports:
-      - "${ML_SERVICE_PORT}:8000"
+    environment:
+      - PYTHONUNBUFFERED=1
+    networks:
+      - readease-network
 
+# ──────────────────────────────────────────────
+# Named Volumes
+# ──────────────────────────────────────────────
 volumes:
-  postgres_data:
+  pgdata:
+    driver: local
+  redisdata:
+    driver: local
+
+# ──────────────────────────────────────────────
+# Network
+# ──────────────────────────────────────────────
+networks:
+  readease-network:
+    driver: bridge
