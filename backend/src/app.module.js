@@ -1,10 +1,20 @@
 const { Module } = require('@nestjs/common');
+const { ConfigModule } = require('@nestjs/config');
 const { AppController } = require('./app.controller');
 const { AppService } = require('./app.service');
+const { configModules, validationSchema, validationOptions } = require('./config');
 
 /** @type {import('@nestjs/common').ModuleMetadata} */
 const metadata = {
-  imports: [],
+  imports: [
+    ConfigModule.forRoot({
+      isGlobal: true,
+      load: configModules,
+      validationSchema,
+      validationOptions,
+      envFilePath: ['.env', '../.env'],
+    }),
+  ],
   controllers: [AppController],
   providers: [AppService],
 };
