@@ -6,6 +6,7 @@ const { AppService } = require('./app.service');
 const { configModules, validationSchema, validationOptions } = require('./config');
 const { LoggingInterceptor } = require('./common/interceptors/logging.interceptor');
 const { requestIdMiddleware } = require('./common/middleware/request-id.middleware');
+const { HealthModule } = require('./modules/health/health.module');
 
 /** @type {import('@nestjs/common').ModuleMetadata} */
 const metadata = {
@@ -17,6 +18,7 @@ const metadata = {
       validationOptions,
       envFilePath: ['.env', '../.env'],
     }),
+    HealthModule,
   ],
   controllers: [AppController],
   providers: [
