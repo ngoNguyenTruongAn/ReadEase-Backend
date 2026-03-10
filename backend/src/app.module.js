@@ -22,6 +22,8 @@ const { TokenEntity } = require('./modules/gamification/entities/token.entity');
 const { RewardEntity } = require('./modules/gamification/entities/reward.entity');
 const { RedemptionEntity } = require('./modules/gamification/entities/redemption.entity');
 const { ReportEntity } = require('./modules/reports/entities/report.entity');
+const { AuthModule } = require('./modules/auth/auth.module');
+
 
 const entities = [
   UserEntity,
@@ -52,7 +54,7 @@ const metadata = {
         type: 'postgres',
         host: configService.get('database.host'),
         port: configService.get('database.port'),
-        username: configService.get('database.user'),
+        username: configService.get('database.username'),
         password: configService.get('database.password'),
         database: configService.get('database.name'),
         entities,
@@ -61,6 +63,7 @@ const metadata = {
       }),
     }),
     HealthModule,
+    AuthModule,
   ],
   controllers: [AppController],
   providers: [

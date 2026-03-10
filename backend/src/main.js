@@ -7,9 +7,7 @@ const { AllExceptionsFilter } = require('./common/filters/all-exceptions.filter'
 const { TransformInterceptor } = require('./common/interceptors/transform.interceptor');
 
 async function bootstrap() {
-  const app = await NestFactory.create(AppModule, {
-    logger: false,
-  });
+ const app = await NestFactory.create(AppModule);
 
   const configService = app.get(ConfigService);
   const port = configService.get('app.port', 3000);

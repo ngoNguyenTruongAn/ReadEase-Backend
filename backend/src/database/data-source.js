@@ -12,7 +12,7 @@ const AppDataSource = new DataSource({
   host: process.env.DB_HOST || 'localhost',
   port: parseInt(process.env.DB_PORT, 10) || 5432,
   username: process.env.DB_USER || 'readease_app',
-  password: process.env.DB_PASSWORD || 'password',
+  password: process.env.DB_PASSWORD || 'devpassword',
   database: process.env.DB_NAME || 'readease',
   migrations: [path.join(__dirname, 'migrations', '*.js')],
   logging: process.env.APP_ENV === 'development',
