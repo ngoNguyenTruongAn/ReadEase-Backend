@@ -1,12 +1,40 @@
 const { Module } = require('@nestjs/common');
 const { APP_INTERCEPTOR } = require('@nestjs/core');
-const { ConfigModule } = require('@nestjs/config');
+const { ConfigModule, ConfigService } = require('@nestjs/config');
+const { TypeOrmModule } = require('@nestjs/typeorm');
 const { AppController } = require('./app.controller');
 const { AppService } = require('./app.service');
 const { configModules, validationSchema, validationOptions } = require('./config');
 const { LoggingInterceptor } = require('./common/interceptors/logging.interceptor');
 const { requestIdMiddleware } = require('./common/middleware/request-id.middleware');
 const { HealthModule } = require('./modules/health/health.module');
+
+// ── Entity imports ──
+const { UserEntity } = require('./modules/users/entities/user.entity');
+const { ChildrenProfileEntity } = require('./modules/users/entities/children-profile.entity');
+const { ReadingContentEntity } = require('./modules/reading/entities/reading-content.entity');
+const { ReadingSessionEntity } = require('./modules/reading/entities/reading-session.entity');
+const { MouseEventEntity } = require('./modules/tracking/entities/mouse-event.entity');
+const {
+  SessionReplayEventEntity,
+} = require('./modules/tracking/entities/session-replay-event.entity');
+const { TokenEntity } = require('./modules/gamification/entities/token.entity');
+const { RewardEntity } = require('./modules/gamification/entities/reward.entity');
+const { RedemptionEntity } = require('./modules/gamification/entities/redemption.entity');
+const { ReportEntity } = require('./modules/reports/entities/report.entity');
+
+const entities = [
+  UserEntity,
+  ChildrenProfileEntity,
+  ReadingContentEntity,
+  ReadingSessionEntity,
+  MouseEventEntity,
+  SessionReplayEventEntity,
+  TokenEntity,
+  RewardEntity,
+  RedemptionEntity,
+  ReportEntity,
+];
 
 /** @type {import('@nestjs/common').ModuleMetadata} */
 const metadata = {
@@ -17,6 +45,20 @@ const metadata = {
       validationSchema,
       validationOptions,
       envFilePath: ['.env', '../.env'],
+    }),
+    TypeOrmModule.forRootAsync({
+      inject: [ConfigService],
+      useFactory: (configService) => ({
+        type: 'postgres',
+        host: configService.get('database.host'),
+        port: configService.get('database.port'),
+        username: configService.get('database.user'),
+        password: configService.get('database.password'),
+        database: configService.get('database.name'),
+        entities,
+        synchronize: false, // NEVER true in production — use migrations
+        logging: configService.get('app.env') === 'development',
+      }),
     }),
     HealthModule,
   ],
