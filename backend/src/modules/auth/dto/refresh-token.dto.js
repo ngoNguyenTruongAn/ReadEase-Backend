@@ -1,7 +1,11 @@
+const Joi = require('joi');
+
 class RefreshTokenDto {
-  constructor(refreshToken) {
-    this.refreshToken = refreshToken;
-  }
+
+  static schema = Joi.object({
+    refreshToken: Joi.string().required()
+  });
+
 }
 
 module.exports = RefreshTokenDto;

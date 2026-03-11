@@ -1,8 +1,19 @@
+const Joi = require('joi');
+
 class LoginDto {
-  constructor(email, password) {
-    this.email = email;
-    this.password = password;
-  }
+
+  static schema = Joi.object({
+
+    email: Joi.string()
+      .email()
+      .required(),
+
+    password: Joi.string()
+      .min(8)
+      .required()
+
+  });
+
 }
 
 module.exports = LoginDto;

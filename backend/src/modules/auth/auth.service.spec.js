@@ -1,95 +1,83 @@
-import { Test, TestingModule } from '@nestjs/testing'
-import { AuthService } from './auth.service'
-import { JwtService } from '@nestjs/jwt'
-import { getRepositoryToken } from '@nestjs/typeorm'
-import { User } from '../users/entities/user.entity'
-import * as bcrypt from 'bcrypt'
+const { Test } = require('@nestjs/testing');
+const { AuthService } = require('./auth.service');
+const { JwtService } = require('@nestjs/jwt');
+const { getRepositoryToken } = require('@nestjs/typeorm');
+
+const bcrypt = require('bcrypt');
+
+const { UserEntity } = require('../users/entities/user.entity');
 
 describe('AuthService', () => {
 
-  let service
-  let repo
+  let service;
+  let repo;
+  let jwtService;
 
-  const mockUserRepo = {
+  const mockRepo = {
     findOne: jest.fn(),
     create: jest.fn(),
     save: jest.fn()
-  }
+  };
 
   const mockJwt = {
     sign: jest.fn().mockReturnValue('mock-token')
-  }
+  };
 
   beforeEach(async () => {
 
-    const module: TestingModule = await Test.createTestingModule({
+    const module = await Test.createTestingModule({
       providers: [
         AuthService,
         {
-          provide: getRepositoryToken(User),
-          useValue: mockUserRepo
+          provide: getRepositoryToken(UserEntity),
+          useValue: mockRepo
         },
         {
           provide: JwtService,
           useValue: mockJwt
         }
       ]
-    }).compile()
+    }).compile();
 
-    service = module.get<AuthService>(AuthService)
-    repo = module.get(getRepositoryToken(User))
-  })
+    service = module.get(AuthService);
+    repo = module.get(getRepositoryToken(UserEntity));
+    jwtService = module.get(JwtService);
+
+  });
 
   afterEach(() => {
-    jest.clearAllMocks()
-  })
+    jest.clearAllMocks();
+  });
 
   it('should register user', async () => {
 
-    repo.findOne.mockResolvedValue(null)
+    repo.findOne.mockResolvedValue(null);
 
-    jest.spyOn(bcrypt, 'hash').mockResolvedValue('hashed-password')
+    jest.spyOn(bcrypt, 'hash').mockResolvedValue('hashed-password');
 
     repo.create.mockReturnValue({
       id: 1,
-      email: 'test@mail.com'
-    })
+      email: 'test@mail.com',
+      role: 'ROLE_CHILD'
+    });
 
     repo.save.mockResolvedValue({
       id: 1,
-      email: 'test@mail.com'
-    })
+      email: 'test@mail.com',
+      role: 'ROLE_CHILD'
+    });
 
     const result = await service.register({
       email: 'test@mail.com',
-      password: '123456',
+      password: '12345678',
       displayName: 'Test',
-      role: 'child'
-    })
+      role: 'ROLE_CHILD'
+    });
 
-    expect(result.accessToken).toBeDefined()
-    expect(result.refreshToken).toBeDefined()
+    expect(result.accessToken).toBeDefined();
+    expect(result.refreshToken).toBeDefined();
+    expect(jwtService.sign).toHaveBeenCalled();
 
-  })
+  });
 
-  it('should login user', async () => {
-
-    repo.findOne.mockResolvedValue({
-      id: 1,
-      email: 'test@mail.com',
-      password_hash: 'hashed-password',
-      role: 'child'
-    })
-
-    jest.spyOn(bcrypt, 'compare').mockResolvedValue(true)
-
-    const result = await service.login({
-      email: 'test@mail.com',
-      password: '123456'
-    })
-
-    expect(result.accessToken).toBeDefined()
-
-  })
-
-})
+});

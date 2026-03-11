@@ -17,6 +17,9 @@ class AuthService {
     this.jwtService = jwtService;
   }
 
+  /**
+   * REGISTER
+   */
   async register(dto) {
 
     const existing = await this.userRepository.findOne({
@@ -32,14 +35,40 @@ class AuthService {
     const user = this.userRepository.create({
       email: dto.email,
       password_hash,
-      role: dto.role || 'parent'
+      display_name: dto.displayName,
+      role: dto.role || 'ROLE_GUARDIAN'
     });
 
     await this.userRepository.save(user);
 
-    return { message: 'User registered successfully' };
+    const payload = {
+      sub: user.id,
+      email: user.email,
+      role: user.role
+    };
+
+    const accessToken = this.jwtService.sign(payload, {
+      expiresIn: '15m'
+    });
+
+    const refreshToken = this.jwtService.sign(payload, {
+      expiresIn: '7d'
+    });
+
+    return {
+      accessToken,
+      refreshToken,
+      user: {
+        id: user.id,
+        email: user.email,
+        role: user.role
+      }
+    };
   }
 
+  /**
+   * LOGIN
+   */
   async login(dto) {
 
     const user = await this.userRepository.findOne({
@@ -72,25 +101,45 @@ class AuthService {
 
     return {
       accessToken,
-      refreshToken
+      refreshToken,
+      user: {
+        id: user.id,
+        email: user.email,
+        role: user.role
+      }
     };
   }
 
+  /**
+   * REFRESH TOKEN
+   */
   async refresh(dto) {
 
     try {
 
       const payload = this.jwtService.verify(dto.refreshToken);
 
-      const accessToken = this.jwtService.sign({
-        sub: payload.sub,
-        email: payload.email,
-        role: payload.role
+      const user = await this.userRepository.findOne({
+        where: { id: payload.sub }
+      });
+
+      if (!user) {
+        throw new UnauthorizedException();
+      }
+
+      const newPayload = {
+        sub: user.id,
+        email: user.email,
+        role: user.role
+      };
+
+      const accessToken = this.jwtService.sign(newPayload, {
+        expiresIn: '15m'
       });
 
       return { accessToken };
 
-    } catch {
+    } catch (err) {
 
       throw new UnauthorizedException('Invalid refresh token');
 
@@ -100,12 +149,11 @@ class AuthService {
 
 }
 
-InjectRepository(UserEntity)(AuthService, null, 0);
-Reflect.decorate(
-  [require('@nestjs/common').Inject(JwtService)],
-  AuthService,
-  1
-);
+/**
+ * Dependency Injection
+ */
+InjectRepository(UserEntity)(AuthService, undefined, 0);
+require('@nestjs/common').Inject(JwtService)(AuthService, undefined, 1);
 Injectable()(AuthService);
 
 module.exports = { AuthService };
