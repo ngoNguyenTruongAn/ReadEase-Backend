@@ -24,7 +24,6 @@ const { RedemptionEntity } = require('./modules/gamification/entities/redemption
 const { ReportEntity } = require('./modules/reports/entities/report.entity');
 const { AuthModule } = require('./modules/auth/auth.module');
 
-
 const entities = [
   UserEntity,
   ChildrenProfileEntity,

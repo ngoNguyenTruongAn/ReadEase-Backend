@@ -5,7 +5,7 @@
 const Role = {
   CHILD: 'ROLE_CHILD',
   CLINICIAN: 'ROLE_CLINICIAN',
-  GUARDIAN: 'ROLE_GUARDIAN'
+  GUARDIAN: 'ROLE_GUARDIAN',
 };
 
 module.exports = { Role };
