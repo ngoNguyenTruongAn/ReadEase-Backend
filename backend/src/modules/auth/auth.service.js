@@ -1,8 +1,4 @@
-const {
-  Injectable,
-  UnauthorizedException,
-  ConflictException
-} = require('@nestjs/common');
+const { Injectable, UnauthorizedException, ConflictException } = require('@nestjs/common');
 
 const bcrypt = require('bcrypt');
 const { JwtService } = require('@nestjs/jwt');
@@ -11,7 +7,6 @@ const { InjectRepository } = require('@nestjs/typeorm');
 const { UserEntity } = require('../users/entities/user.entity');
 
 class AuthService {
-
   constructor(userRepository, jwtService) {
     this.userRepository = userRepository;
     this.jwtService = jwtService;
@@ -21,9 +16,8 @@ class AuthService {
    * REGISTER
    */
   async register(dto) {
-
     const existing = await this.userRepository.findOne({
-      where: { email: dto.email }
+      where: { email: dto.email },
     });
 
     if (existing) {
@@ -36,7 +30,7 @@ class AuthService {
       email: dto.email,
       password_hash,
       display_name: dto.displayName,
-      role: dto.role || 'ROLE_GUARDIAN'
+      role: dto.role || 'ROLE_GUARDIAN',
     });
 
     await this.userRepository.save(user);
@@ -44,15 +38,15 @@ class AuthService {
     const payload = {
       sub: user.id,
       email: user.email,
-      role: user.role
+      role: user.role,
     };
 
     const accessToken = this.jwtService.sign(payload, {
-      expiresIn: '15m'
+      expiresIn: '15m',
     });
 
     const refreshToken = this.jwtService.sign(payload, {
-      expiresIn: '7d'
+      expiresIn: '7d',
     });
 
     return {
@@ -61,8 +55,8 @@ class AuthService {
       user: {
         id: user.id,
         email: user.email,
-        role: user.role
-      }
+        role: user.role,
+      },
     };
   }
 
@@ -70,9 +64,8 @@ class AuthService {
    * LOGIN
    */
   async login(dto) {
-
     const user = await this.userRepository.findOne({
-      where: { email: dto.email }
+      where: { email: dto.email },
     });
 
     if (!user) {
@@ -88,15 +81,15 @@ class AuthService {
     const payload = {
       sub: user.id,
       email: user.email,
-      role: user.role
+      role: user.role,
     };
 
     const accessToken = this.jwtService.sign(payload, {
-      expiresIn: '15m'
+      expiresIn: '15m',
     });
 
     const refreshToken = this.jwtService.sign(payload, {
-      expiresIn: '7d'
+      expiresIn: '7d',
     });
 
     return {
@@ -105,8 +98,8 @@ class AuthService {
       user: {
         id: user.id,
         email: user.email,
-        role: user.role
-      }
+        role: user.role,
+      },
     };
   }
 
@@ -114,13 +107,11 @@ class AuthService {
    * REFRESH TOKEN
    */
   async refresh(dto) {
-
     try {
-
       const payload = this.jwtService.verify(dto.refreshToken);
 
       const user = await this.userRepository.findOne({
-        where: { id: payload.sub }
+        where: { id: payload.sub },
       });
 
       if (!user) {
@@ -130,23 +121,18 @@ class AuthService {
       const newPayload = {
         sub: user.id,
         email: user.email,
-        role: user.role
+        role: user.role,
       };
 
       const accessToken = this.jwtService.sign(newPayload, {
-        expiresIn: '15m'
+        expiresIn: '15m',
       });
 
       return { accessToken };
-
-    } catch (err) {
-
+    } catch {
       throw new UnauthorizedException('Invalid refresh token');
-
     }
-
   }
-
 }
 
 /**
