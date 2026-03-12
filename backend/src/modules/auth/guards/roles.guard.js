@@ -6,7 +6,7 @@
  *
  * Usage: @UseGuards(JwtAuthGuard, RolesGuard)
  */
-const { Injectable, Dependencies } = require('@nestjs/common');
+const { Injectable, Inject } = require('@nestjs/common');
 const { Reflector } = require('@nestjs/core');
 
 class RolesGuard {
@@ -37,6 +37,7 @@ class RolesGuard {
   }
 }
 
-Reflect.decorate([Injectable(), Dependencies(Reflector)], RolesGuard);
+Inject(Reflector)(RolesGuard, undefined, 0);
+Injectable()(RolesGuard);
 
 module.exports = { RolesGuard };

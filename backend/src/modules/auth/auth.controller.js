@@ -21,7 +21,7 @@ const {
 const { AuthService } = require('./auth.service');
 const { JwtAuthGuard } = require('./guards/jwt-auth.guard');
 const { RolesGuard } = require('./guards/roles.guard');
-const Roles = require('./decorators/roles.decorator');
+const { Roles } = require('./decorators/roles.decorator');
 
 const RegisterDto = require('./dto/register.dto');
 const LoginDto = require('./dto/login.dto');
@@ -95,7 +95,7 @@ class AuthController {
 }
 
 // ── Class decorators ──
-Controller('auth')(AuthController);
+Controller('api/v1/auth')(AuthController);
 Inject(AuthService)(AuthController, undefined, 0);
 
 // ── POST /auth/register (Public) ──

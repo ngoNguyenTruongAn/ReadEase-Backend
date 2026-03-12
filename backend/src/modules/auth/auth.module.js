@@ -2,6 +2,7 @@ require('reflect-metadata');
 
 const { Module } = require('@nestjs/common');
 const { JwtModule } = require('@nestjs/jwt');
+const { ConfigService } = require('@nestjs/config');
 const { TypeOrmModule } = require('@nestjs/typeorm');
 
 const { AuthService } = require('./auth.service');
@@ -17,9 +18,12 @@ class AuthModule {}
 Module({
   imports: [
     TypeOrmModule.forFeature([UserEntity]),
-    JwtModule.register({
-      secret: process.env.JWT_SECRET || 'dev-secret-change-this',
-      signOptions: { expiresIn: '15m' },
+    JwtModule.registerAsync({
+      inject: [ConfigService],
+      useFactory: (configService) => ({
+        secret: configService.get('jwt.secret'),
+        signOptions: { expiresIn: `${configService.get('jwt.accessTtl', 900)}s` },
+      }),
     }),
   ],
   controllers: [AuthController],

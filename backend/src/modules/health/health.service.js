@@ -2,23 +2,25 @@
  * Health Service
  *
  * Performs liveness checks for:
- * - PostgreSQL database (pg_isready equivalent via query)
- * - Redis cache (PING command)
+ * - PostgreSQL database (SELECT 1)
+ * - Redis cache (config check — real PING when Redis module added)
  * - Memory usage (heap, RSS)
  *
  * Returns "ok" if all checks pass, "degraded" if any check fails.
- * App still responds — it is NOT down, just degraded.
  */
 const { Injectable } = require('@nestjs/common');
 const { ConfigService } = require('@nestjs/config');
+const { DataSource } = require('typeorm');
 const { logger } = require('../../common/logger/winston.config');
 
 class HealthService {
   /**
    * @param {ConfigService} configService
+   * @param {DataSource} dataSource
    */
-  constructor(configService) {
+  constructor(configService, dataSource) {
     this.configService = configService;
+    this.dataSource = dataSource;
   }
 
   /**
@@ -35,7 +37,7 @@ class HealthService {
       checks: {},
     };
 
-    // Database check
+    // Database check — real query
     result.checks.database = await this._checkDatabase();
     if (result.checks.database.status !== 'ok') {
       result.status = 'degraded';
@@ -54,26 +56,20 @@ class HealthService {
   }
 
   /**
-   * Check PostgreSQL connectivity
-   * TODO: Replace with actual TypeORM DataSource.query('SELECT 1') when DB module is added
+   * Check PostgreSQL connectivity via real query
    * @returns {Promise<object>}
    */
   async _checkDatabase() {
     try {
-      const dbHost = this.configService.get('database.host');
-      const dbName = this.configService.get('database.name');
-
-      // Placeholder: when TypeORM is connected, this will do: await this.dataSource.query('SELECT 1')
-      // For now, report config status
-      if (!dbHost) {
-        return { status: 'error', message: 'DB_HOST not configured' };
-      }
+      const startMs = Date.now();
+      await this.dataSource.query('SELECT 1');
+      const durationMs = Date.now() - startMs;
 
       return {
         status: 'ok',
-        host: dbHost,
-        database: dbName,
-        message: 'Configuration valid (connection check pending TypeORM setup)',
+        host: this.configService.get('database.host'),
+        database: this.configService.get('database.name'),
+        responseTimeMs: durationMs,
       };
     } catch (error) {
       logger.error('Database health check failed', {
@@ -86,14 +82,13 @@ class HealthService {
 
   /**
    * Check Redis connectivity
-   * TODO: Replace with actual Redis client.ping() when Redis module is added
+   * TODO: Replace with real Redis client.ping() when Redis module is added
    * @returns {Promise<object>}
    */
   async _checkRedis() {
     try {
       const redisHost = this.configService.get('redis.host');
 
-      // Placeholder: when ioredis is connected, this will do: await this.redis.ping()
       if (!redisHost) {
         return { status: 'error', message: 'REDIS_HOST not configured' };
       }
@@ -101,7 +96,7 @@ class HealthService {
       return {
         status: 'ok',
         host: redisHost,
-        message: 'Configuration valid (connection check pending Redis module setup)',
+        message: 'Configuration valid (real PING pending Redis module)',
       };
     } catch (error) {
       logger.error('Redis health check failed', {
@@ -128,8 +123,8 @@ class HealthService {
   }
 }
 
-// NestJS DI: inject ConfigService
+// NestJS DI: inject ConfigService + DataSource
 const { Dependencies } = require('@nestjs/common');
-Reflect.decorate([Injectable(), Dependencies(ConfigService)], HealthService);
+Reflect.decorate([Injectable(), Dependencies(ConfigService, DataSource)], HealthService);
 
 module.exports = { HealthService };

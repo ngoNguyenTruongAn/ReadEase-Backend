@@ -24,7 +24,7 @@ class AuthService {
       throw new ConflictException('Email already exists');
     }
 
-    const password_hash = await bcrypt.hash(dto.password, 10);
+    const password_hash = await bcrypt.hash(dto.password, 12);
 
     const user = this.userRepository.create({
       email: dto.email,
