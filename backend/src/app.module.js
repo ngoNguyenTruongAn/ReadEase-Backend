@@ -9,7 +9,7 @@ const { configModules, validationSchema, validationOptions } = require('./config
 const { LoggingInterceptor } = require('./common/interceptors/logging.interceptor');
 const { requestIdMiddleware } = require('./common/middleware/request-id.middleware');
 const { HealthModule } = require('./modules/health/health.module');
-
+const {TrackingModule} = require('./modules/tracking/tracking.module');
 // ── Entity imports ──
 const { UserEntity } = require('./modules/users/entities/user.entity');
 const { ChildrenProfileEntity } = require('./modules/users/entities/children-profile.entity');
@@ -64,6 +64,7 @@ const metadata = {
     }),
     HealthModule,
     AuthModule,
+    TrackingModule,
     ThrottlerModule.forRoot([
       {
         ttl: 60000,
