@@ -1,13 +1,21 @@
-const { Injectable } = require('@nestjs/common');
+/**
+ * JWT Strategy
+ *
+ * Validates access tokens from Authorization: Bearer header.
+ * Uses ConfigService to get JWT secret (no hardcoded fallback).
+ */
+const { Injectable, Inject } = require('@nestjs/common');
+const { ConfigService } = require('@nestjs/config');
 const { PassportStrategy } = require('@nestjs/passport');
 const { ExtractJwt, Strategy } = require('passport-jwt');
 
 class JwtStrategy extends PassportStrategy(Strategy) {
-  constructor() {
+  /** @param {ConfigService} configService */
+  constructor(configService) {
     super({
       jwtFromRequest: ExtractJwt.fromAuthHeaderAsBearerToken(),
       ignoreExpiration: false,
-      secretOrKey: process.env.JWT_SECRET || 'dev-secret-change-this',
+      secretOrKey: configService.get('jwt.secret'),
     });
   }
 
@@ -16,6 +24,7 @@ class JwtStrategy extends PassportStrategy(Strategy) {
   }
 }
 
+Inject(ConfigService)(JwtStrategy, undefined, 0);
 Injectable()(JwtStrategy);
 
 module.exports = { JwtStrategy };

@@ -1,7 +1,8 @@
 const { Module } = require('@nestjs/common');
-const { APP_INTERCEPTOR } = require('@nestjs/core');
+const { APP_INTERCEPTOR, APP_GUARD } = require('@nestjs/core');
 const { ConfigModule, ConfigService } = require('@nestjs/config');
 const { TypeOrmModule } = require('@nestjs/typeorm');
+const { ThrottlerModule, ThrottlerGuard } = require('@nestjs/throttler');
 const { AppController } = require('./app.controller');
 const { AppService } = require('./app.service');
 const { configModules, validationSchema, validationOptions } = require('./config');
@@ -63,6 +64,12 @@ const metadata = {
     }),
     HealthModule,
     AuthModule,
+    ThrottlerModule.forRoot([
+      {
+        ttl: 60000,
+        limit: 100,
+      },
+    ]),
   ],
   controllers: [AppController],
   providers: [
@@ -70,6 +77,10 @@ const metadata = {
     {
       provide: APP_INTERCEPTOR,
       useClass: LoggingInterceptor,
+    },
+    {
+      provide: APP_GUARD,
+      useClass: ThrottlerGuard,
     },
   ],
 };
