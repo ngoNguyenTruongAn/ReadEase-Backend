@@ -1,96 +1,206 @@
-const WebSocket = require("ws");
-const { randomUUID } = require("crypto");
-// Import hàm verify JWT từ file của bạn
-const { verifyWebSocketJWT } = require("./utils/jwt-auth"); 
+const {
+  WebSocketGateway,
+  SubscribeMessage
+} = require("@nestjs/websockets");
+
+const { Injectable, Inject } = require("@nestjs/common");
+
+const { logger } = require("../../common/logger/winston.config");
+
+const {
+  ws_connection_count,
+  trajectory_events_received,
+  ws_processing_latency
+} = require("../../common/observability/metrics");
+
+const { verifyWebSocketJWT } = require("./utils/jwt-auth");
+
+const TrajectoryBufferService = require("./services/trajectory-buffer.service");
+const SessionService = require("./services/session.service");
 
 class TrackingGateway {
-  constructor(trajectoryBuffer, replayStorage) {
-    this.trajectoryBuffer = trajectoryBuffer;
-    this.replayStorage = replayStorage;
 
-    this.startServer();
+  constructor(trajectoryBufferService, sessionService) {
+    this.trajectoryBuffer = trajectoryBufferService;
+    this.sessionService = sessionService;
   }
 
-  startServer() {
-    const port = process.env.WS_PORT || 3001;
+  handleConnection(client, request) {
 
-    this.wss = new WebSocket.Server({
-      port,
-      path: "/tracking",
-    });
+    try {
 
-    console.log(`Tracking WebSocket running on ws://localhost:${port}/tracking`);
+      const url = new URL(request.url, "http://localhost");
+      const token = url.searchParams.get("token");
 
-    // req chứa thông tin của request HTTP upgrade ban đầu
-    this.wss.on("connection", (ws, req) => {
-      console.log("Client connected");
-      console.log("WS CONNECTION PATH:", req.url);
+      const decoded = verifyWebSocketJWT(token);
 
-      try {
-        // 1. Lấy token từ query parameter của URL
-        // Ví dụ URL: ws://localhost:3001/tracking?token=abc...
-        const url = new URL(req.url, `http://${req.headers.host}`);
-        const token = url.searchParams.get("token");
+      client.user_id = decoded.user_id;
+      client.session_id = decoded.session_id;
 
-        if (!token) {
-          throw new Error("Missing token in query parameters");
-        }
+      ws_connection_count.inc();
 
-        // 2. Xác thực JWT
-        const decoded = verifyWebSocketJWT(token);
+      logger.info("WS client connected", {
+        context: "TrackingGateway",
+        data: decoded
+      });
 
-        // 3. Gắn thông tin user/session vào object `ws` để dùng cho các event sau
-        ws.user_id = decoded.userId;
-        ws.session_id = decoded.sessionId;
-        
-        console.log(`Authenticated connection for User: ${ws.userId}, Session: ${ws.sessionId}`);
+    } catch (err) {
 
-      } catch (error) {
-        console.error("WebSocket Authentication failed:", error.message);
-        // Đóng kết nối ngay lập tức với mã lỗi 1008 (Policy Violation)
-        ws.close(1008, "Unauthorized");
-        return; 
-      }
+      logger.warn("WS auth failed", {
+        context: "TrackingGateway",
+        data: { error: err.message }
+      });
 
-      // Xử lý message bình thường sau khi đã xác thực thành công
-      ws.on("message", async (message) => {
-        console.log("RAW WS MESSAGE:", message.toString());
-        try {
-          const data = JSON.parse(message.toString());
+      client.close();
 
-          switch (data.event) {
-            case "session:start":
-              // Ưu tiên dùng sessionId từ JWT nếu có, nếu không thì lấy từ payload / random
-              ws.sessionId = ws.sessionId || data.payload.sessionId || randomUUID();
-              console.log("Session started:", ws.sessionId);
-              break;
+    }
 
-            case "mouse:batch":
-              if (!ws.sessionId) return;
+  }
 
-              await this.trajectoryBuffer.push(
-                ws.sessionId,
-                data.payload.points
-              );
-              break;
+  /* =========================
+     SESSION START
+  ========================= */
 
-            case "session:end":
-              if (!ws.sessionId) return;
+  async handleSessionStart(client, payload) {
 
-              await this.trajectoryBuffer.flushSession(ws.sessionId);
-              console.log("Session ended:", ws.sessionId);
-              break;
-          }
-        } catch (err) {
-          console.error("WS message error:", err);
+    try {
+
+      if (!client.session_id) return;
+
+      const contentId =
+        payload?.contentId ||
+        payload?.content_id ||
+        "11111111-1111-1111-1111-111111111111";
+
+      await this.sessionService.ensureSession(
+        client.session_id,
+        client.user_id,
+        contentId
+      );
+
+      logger.info("Session started", {
+        context: "TrackingGateway",
+        data: {
+          sessionId: client.session_id,
+          contentId
         }
       });
 
-      ws.on("close", () => {
-        console.log(`Client disconnected (Session: ${ws.sessionId})`);
+    } catch (err) {
+
+      logger.error("session:start failed", {
+        context: "TrackingGateway",
+        data: { error: err.message }
       });
-    });
+
+    }
+
   }
+
+  /* =========================
+     MOUSE BATCH
+  ========================= */
+
+  async handleMouseBatch(client, payload) {
+
+    const end = ws_processing_latency.startTimer();
+
+    try {
+
+      if (!client.session_id) return;
+
+      const points = payload?.data?.points || payload?.points || [];
+
+      trajectory_events_received.inc(points.length);
+
+      await this.trajectoryBuffer.push(
+        client.session_id,
+        client.user_id,
+        points
+      );
+
+    } catch (err) {
+
+      logger.error("mouse batch failed", {
+        context: "TrackingGateway",
+        data: { error: err.message }
+      });
+
+    }
+
+    end();
+
+  }
+
+  /* =========================
+     SESSION END
+  ========================= */
+
+  async handleSessionEnd(client) {
+
+    try {
+
+      if (!client.session_id) return;
+
+      await this.trajectoryBuffer.flushSession(
+        client.session_id
+      );
+
+      await this.sessionService.endSession(
+        client.session_id
+      );
+
+    } catch (err) {
+
+      logger.error("session end failed", {
+        context: "TrackingGateway",
+        data: { error: err.message }
+      });
+
+    }
+
+  }
+
 }
 
-module.exports = { TrackingGateway };
+Injectable()(TrackingGateway);
+
+Inject(TrajectoryBufferService)(TrackingGateway, undefined, 0);
+Inject(SessionService)(TrackingGateway, undefined, 1);
+
+Reflect.decorate(
+  [WebSocketGateway({ path: "/tracking", cors: true })],
+  TrackingGateway
+);
+
+Reflect.decorate(
+  [SubscribeMessage("session:start")],
+  TrackingGateway.prototype,
+  "handleSessionStart",
+  Object.getOwnPropertyDescriptor(
+    TrackingGateway.prototype,
+    "handleSessionStart"
+  )
+);
+
+Reflect.decorate(
+  [SubscribeMessage("mouse:batch")],
+  TrackingGateway.prototype,
+  "handleMouseBatch",
+  Object.getOwnPropertyDescriptor(
+    TrackingGateway.prototype,
+    "handleMouseBatch"
+  )
+);
+
+Reflect.decorate(
+  [SubscribeMessage("session:end")],
+  TrackingGateway.prototype,
+  "handleSessionEnd",
+  Object.getOwnPropertyDescriptor(
+    TrackingGateway.prototype,
+    "handleSessionEnd"
+  )
+);
+
+module.exports = TrackingGateway;

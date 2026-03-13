@@ -1,60 +1,179 @@
+const { Injectable, Inject } = require("@nestjs/common");
+const Redis = require("ioredis");
+
+const { logger } = require("../../../common/logger/winston.config");
+
+const {
+  redis_flush_latency,
+} = require("../../../common/observability/metrics");
+
+const ReplayStorageService = require("./replay-storage.service");
+
 class TrajectoryBufferService {
-  constructor(replayStorage) {
-    this.replayStorage = replayStorage;
-    this.buffers = new Map();
 
-    setInterval(() => {
-      this.flushAll();
-    }, 2000);
+  constructor(replayStorageService) {
+
+    this.replayStorage = replayStorageService;
+
+    this.redis = new Redis({
+      host: process.env.REDIS_HOST,
+      port: process.env.REDIS_PORT,
+    });
+
+    this.prefix = process.env.REDIS_TRAJECTORY_PREFIX || "trajectory";
+
+    this.flushInterval = parseInt(
+      process.env.REDIS_FLUSH_INTERVAL || "5000"
+    );
+
+    this.flushing = false;
+
+    setInterval(() => this.flushAll(), this.flushInterval);
+
   }
 
-  addEvent(sessionId, event) {
-    if (!this.buffers.has(sessionId)) {
-      this.buffers.set(sessionId, []);
-    }
-    this.buffers.get(sessionId).push(event);
+  getKey(sessionId) {
+    return `${this.prefix}:${sessionId}`;
   }
 
-  // Gateway đang gọi hàm này để thêm nhiều điểm chuột cùng lúc
-  async push(sessionId, points) {
+  async push(sessionId, userId, points) {
+
+  const key = this.getKey(sessionId);
+
+  try {
+
+    const pipeline = this.redis.pipeline();
+
     for (const p of points) {
-      this.addEvent(sessionId, { type: "mouse_move", ...p });
+
+      pipeline.rpush(
+        key,
+        JSON.stringify({
+          type: "mouse_move",
+          userId,
+          ...p
+        })
+      );
+
     }
-    console.log("BUFFER PUSH:", sessionId, points.length);
+
+    await pipeline.exec();
+
+  } catch (err) {
+
+    logger.error("Redis RPUSH failed", {
+      context: "TrajectoryBufferService",
+      data: { error: err.message }
+    });
+
   }
 
-  // Gateway gọi hàm này khi end session
-  async flushSession(sessionId) {
-    const events = this.buffers.get(sessionId);
-    if (!events || events.length === 0) return;
+}
 
-    const eventsToStore = [...events];
-    this.buffers.delete(sessionId);
+  async flushSession(sessionId) {
+
+    const end = redis_flush_latency.startTimer();
+
+    const key = this.getKey(sessionId);
 
     try {
-      await this.replayStorage.storeEvents(sessionId, eventsToStore);
+
+      const events = await this.redis.lrange(key, 0, -1);
+
+      if (!events || events.length === 0) {
+        return;
+      }
+
+      const parsed = events.map((e) => JSON.parse(e));
+
+      await this.replayStorage.storeEvents(sessionId, parsed);
+
+      await this.redis.del(key);
+
+      logger.info("Redis session flushed", {
+        context: "TrajectoryBufferService",
+        data: {
+          sessionId,
+          events: parsed.length
+        }
+      });
+
     } catch (err) {
-      console.error(`[Buffer] Lỗi lưu trữ khi end session ${sessionId}:`, err.message);
+
+      logger.error("Redis flush failed", {
+        context: "TrajectoryBufferService",
+        data: {
+          sessionId,
+          error: err.message
+        }
+      });
+
+    } finally {
+
+      end();
+
     }
-    console.log("FLUSH SESSION:", sessionId);
+
   }
 
   async flushAll() {
-    for (const [sessionId, events] of this.buffers.entries()) {
-      if (events.length === 0) continue;
 
-      // 1. Copy events và clear buffer NGAY LẬP TỨC để tránh mất data mới tới (Race condition)
-      const eventsToStore = [...events];
-      this.buffers.set(sessionId, []);
-
-      // 2. Bọc try/catch để interval không bị crash khi DB có vấn đề
-      try {
-        await this.replayStorage.storeEvents(sessionId, eventsToStore);
-      } catch (error) {
-        console.error(`[TrajectoryBuffer] Lỗi khi flush data của session ${sessionId}:`, error.message);
-      }
+    if (this.flushing) {
+      return;
     }
+
+    this.flushing = true;
+
+    let cursor = "0";
+
+    try {
+
+      do {
+
+        const reply = await this.redis.scan(
+          cursor,
+          "MATCH",
+          `${this.prefix}:*`,
+          "COUNT",
+          100
+        );
+
+        cursor = reply[0];
+        const keys = reply[1];
+
+        for (const key of keys) {
+
+          const sessionId = key.split(":")[1];
+
+          await this.flushSession(sessionId);
+
+        }
+
+      } while (cursor !== "0");
+
+    } catch (err) {
+
+      logger.error("SCAN flush error", {
+        context: "TrajectoryBufferService",
+        data: { error: err.message }
+      });
+
+    } finally {
+
+      this.flushing = false;
+
+    }
+
   }
+
 }
+
+Injectable()(TrajectoryBufferService);
+
+Inject(ReplayStorageService)(
+  TrajectoryBufferService,
+  undefined,
+  0
+);
 
 module.exports = TrajectoryBufferService;

@@ -16,7 +16,7 @@ const SESSION_ID = randomUUID();
 const USER_ID = randomUUID();
 const CONTENT_ID = randomUUID();
 
-const WS_URL = process.env.WS_URL || "ws://localhost:3001/tracking";
+const WS_URL = process.env.WS_URL || "ws://localhost:3000";
 const JWT_SECRET = process.env.JWT_SECRET || "test-secret";
 
 const token = jwt.sign(
@@ -227,7 +227,7 @@ async function run() {
     ws.send(
       JSON.stringify({
         event: "session:start",
-        payload: {
+        data: {
           sessionId: SESSION_ID,
           timestamp: Date.now()
         }
@@ -255,7 +255,7 @@ async function run() {
       ws.send(
         JSON.stringify({
           event: "mouse:batch",
-          payload: {
+          data: {
             sessionId: SESSION_ID,
             points
           }
@@ -272,7 +272,7 @@ async function run() {
     ws.send(
       JSON.stringify({
         event: "session:end",
-        payload: {
+        data: {
           sessionId: SESSION_ID
         }
       })
