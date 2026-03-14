@@ -1,5 +1,6 @@
 const { Injectable } = require("@nestjs/common");
 const { InjectDataSource } = require("@nestjs/typeorm");
+const { logger } = require("../../../common/logger/winston.config");
 
 class SessionService {
 
@@ -27,7 +28,10 @@ class SessionService {
 
     } catch (err) {
 
-      console.error("ensureSession error", err.message);
+      logger.error("ensureSession failed", {
+        context: "SessionService",
+        data: { sessionId, error: err.message }
+      });
 
     }
 
@@ -49,7 +53,10 @@ class SessionService {
 
     } catch (err) {
 
-      console.error("endSession error", err.message);
+      logger.error("endSession failed", {
+        context: "SessionService",
+        data: { sessionId, error: err.message }
+      });
 
     }
 
