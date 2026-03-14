@@ -19,7 +19,9 @@
     "test:e2e": "jest --config ./test/jest-e2e.json",
     "migration:run": "npx typeorm migration:run -d src/database/data-source.js",
     "migration:revert": "npx typeorm migration:revert -d src/database/data-source.js",
-    "migration:generate": "npx typeorm migration:generate -d src/database/data-source.js"
+    "migration:generate": "npx typeorm migration:generate -d src/database/data-source.js",
+    "test:integration": "node qa/integration/websocket-flow.test.js",
+    "test:load": "node qa/load-tests/websocket-tracking.test.js"
   },
   "dependencies": {
     "@nestjs/common": "^11.0.1",
@@ -28,19 +30,27 @@
     "@nestjs/jwt": "^11.0.2",
     "@nestjs/passport": "^11.0.5",
     "@nestjs/platform-express": "^11.0.1",
+    "@nestjs/platform-socket.io": "^11.1.16",
+    "@nestjs/platform-ws": "^11.1.16",
     "@nestjs/throttler": "^6.5.0",
     "@nestjs/typeorm": "^11.0.0",
+    "@nestjs/websockets": "^11.1.16",
     "bcrypt": "^6.0.0",
+    "dotenv": "^17.3.1",
+    "ioredis": "^5.10.0",
     "joi": "^18.0.2",
     "jsonwebtoken": "^9.0.3",
     "passport": "^0.7.0",
     "passport-jwt": "^4.0.1",
     "pg": "^8.20.0",
+    "prom-client": "^15.1.3",
     "redis": "^5.11.0",
     "reflect-metadata": "^0.2.2",
     "rxjs": "^7.8.1",
+    "socket.io-client": "^4.8.3",
     "typeorm": "^0.3.28",
-    "winston": "^3.19.0"
+    "winston": "^3.19.0",
+    "ws": "^8.19.0"
   },
   "devDependencies": {
     "@eslint/js": "^9.18.0",

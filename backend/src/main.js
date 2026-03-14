@@ -5,10 +5,12 @@ const { logger } = require('./common/logger/winston.config');
 const { HttpExceptionFilter } = require('./common/filters/http-exception.filter');
 const { AllExceptionsFilter } = require('./common/filters/all-exceptions.filter');
 const { TransformInterceptor } = require('./common/interceptors/transform.interceptor');
+const { WsAdapter } = require('@nestjs/platform-ws');
 
 async function bootstrap() {
   const app = await NestFactory.create(AppModule);
-
+  app.useWebSocketAdapter(new WsAdapter(app));
+  
   const configService = app.get(ConfigService);
   const port = configService.get('app.port', 3000);
   const env = configService.get('app.env', 'development');

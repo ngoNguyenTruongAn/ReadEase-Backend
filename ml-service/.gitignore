@@ -1,0 +1,29 @@
+# Python
+__pycache__/
+*.py[cod]
+*$py.class
+*.so
+
+# Virtual environment
+venv/
+.venv/
+env/
+
+# IDE
+pyrightconfig.json
+.vscode/
+.idea/
+
+# Test
+.pytest_cache/
+test_output.txt
+htmlcov/
+.coverage
+
+# Model artifacts (large binary)
+# Uncomment below if you want to exclude model from git:
+# app/models/model.joblib
+
+# OS
+.DS_Store
+Thumbs.db
