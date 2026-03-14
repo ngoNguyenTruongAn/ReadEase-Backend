@@ -6,20 +6,35 @@ const { getRepositoryToken } = require('@nestjs/typeorm');
 const bcrypt = require('bcrypt');
 
 const { UserEntity } = require('../users/entities/user.entity');
+const { OtpService } = require('./services/otp.service');
+const { EmailService } = require('./services/email.service');
 
 describe('AuthService', () => {
   let service;
   let repo;
   let jwtService;
+  let otpService;
+  let emailService;
 
   const mockRepo = {
     findOne: jest.fn(),
     create: jest.fn(),
     save: jest.fn(),
+    remove: jest.fn(),
   };
 
   const mockJwt = {
     sign: jest.fn().mockReturnValue('mock-token'),
+    verify: jest.fn(),
+  };
+
+  const mockOtpService = {
+    createOTP: jest.fn().mockResolvedValue('123456'),
+    verifyOTP: jest.fn().mockResolvedValue(true),
+  };
+
+  const mockEmailService = {
+    sendOTP: jest.fn().mockResolvedValue(undefined),
   };
 
   beforeEach(async () => {
@@ -34,44 +49,203 @@ describe('AuthService', () => {
           provide: JwtService,
           useValue: mockJwt,
         },
+        {
+          provide: OtpService,
+          useValue: mockOtpService,
+        },
+        {
+          provide: EmailService,
+          useValue: mockEmailService,
+        },
       ],
     }).compile();
 
     service = module.get(AuthService);
     repo = module.get(getRepositoryToken(UserEntity));
     jwtService = module.get(JwtService);
+    otpService = module.get(OtpService);
+    emailService = module.get(EmailService);
   });
 
   afterEach(() => {
     jest.clearAllMocks();
   });
 
-  it('should register user', async () => {
+  // ── Register ──
+  it('should register user and send OTP', async () => {
     repo.findOne.mockResolvedValue(null);
 
     jest.spyOn(bcrypt, 'hash').mockResolvedValue('hashed-password');
 
     repo.create.mockReturnValue({
-      id: 1,
+      id: 'uuid-1',
       email: 'test@mail.com',
-      role: 'ROLE_CHILD',
+      role: 'ROLE_GUARDIAN',
+      email_verified: false,
+      is_active: false,
     });
 
     repo.save.mockResolvedValue({
-      id: 1,
+      id: 'uuid-1',
       email: 'test@mail.com',
-      role: 'ROLE_CHILD',
+      role: 'ROLE_GUARDIAN',
     });
 
     const result = await service.register({
       email: 'test@mail.com',
       password: '12345678',
       displayName: 'Test',
-      role: 'ROLE_CHILD',
+    });
+
+    expect(result.message).toBeDefined();
+    expect(result.email).toBe('test@mail.com');
+    expect(otpService.createOTP).toHaveBeenCalledWith('uuid-1', 'EMAIL_VERIFY');
+    expect(emailService.sendOTP).toHaveBeenCalled();
+    // Should NOT return tokens (pending verification)
+    expect(result.accessToken).toBeUndefined();
+  });
+
+  it('should reject duplicate email', async () => {
+    repo.findOne.mockResolvedValue({
+      id: 'uuid-2',
+      email: 'test@mail.com',
+      email_verified: true,
+    });
+
+    await expect(
+      service.register({
+        email: 'test@mail.com',
+        password: '12345678',
+        displayName: 'Test',
+      }),
+    ).rejects.toThrow('Email này đã được đăng ký');
+  });
+
+  // ── Verify Email ──
+  it('should verify email and activate account', async () => {
+    repo.findOne.mockResolvedValue({
+      id: 'uuid-1',
+      email: 'test@mail.com',
+      role: 'ROLE_GUARDIAN',
+      email_verified: false,
+      is_active: false,
+    });
+
+    repo.save.mockResolvedValue({});
+
+    const result = await service.verifyEmail({
+      email: 'test@mail.com',
+      code: '123456',
     });
 
     expect(result.accessToken).toBeDefined();
     expect(result.refreshToken).toBeDefined();
-    expect(jwtService.sign).toHaveBeenCalled();
+    expect(otpService.verifyOTP).toHaveBeenCalledWith('uuid-1', '123456', 'EMAIL_VERIFY');
+  });
+
+  // ── Login ──
+  it('should reject login if email not verified', async () => {
+    repo.findOne.mockResolvedValue({
+      id: 'uuid-1',
+      email: 'test@mail.com',
+      email_verified: false,
+      is_active: false,
+    });
+
+    await expect(
+      service.login({ email: 'test@mail.com', password: '12345678' }),
+    ).rejects.toThrow('Vui lòng xác thực email');
+  });
+
+  it('should login successfully', async () => {
+    repo.findOne.mockResolvedValue({
+      id: 'uuid-1',
+      email: 'test@mail.com',
+      password_hash: 'hashed',
+      role: 'ROLE_CHILD',
+      email_verified: true,
+      is_active: true,
+    });
+
+    jest.spyOn(bcrypt, 'compare').mockResolvedValue(true);
+    repo.save.mockResolvedValue({});
+
+    const result = await service.login({
+      email: 'test@mail.com',
+      password: '12345678',
+    });
+
+    expect(result.accessToken).toBeDefined();
+    expect(result.refreshToken).toBeDefined();
+    expect(result.user.email).toBe('test@mail.com');
+  });
+
+  // ── Forgot Password ──
+  it('should send forgot password OTP', async () => {
+    repo.findOne.mockResolvedValue({
+      id: 'uuid-1',
+      email: 'test@mail.com',
+    });
+
+    const result = await service.forgotPassword({ email: 'test@mail.com' });
+
+    expect(result.message).toBeDefined();
+    expect(otpService.createOTP).toHaveBeenCalledWith('uuid-1', 'FORGOT_PASSWORD');
+    expect(emailService.sendOTP).toHaveBeenCalled();
+  });
+
+  // ── Reset Password ──
+  it('should reset password with OTP', async () => {
+    repo.findOne.mockResolvedValue({
+      id: 'uuid-1',
+      email: 'test@mail.com',
+    });
+
+    jest.spyOn(bcrypt, 'hash').mockResolvedValue('new-hashed');
+    repo.save.mockResolvedValue({});
+
+    const result = await service.resetPassword({
+      email: 'test@mail.com',
+      code: '123456',
+      newPassword: 'newpass123',
+    });
+
+    expect(result.message).toBeDefined();
+    expect(otpService.verifyOTP).toHaveBeenCalledWith('uuid-1', '123456', 'FORGOT_PASSWORD');
+  });
+
+  // ── Change Password ──
+  it('should change password with correct old password', async () => {
+    repo.findOne.mockResolvedValue({
+      id: 'uuid-1',
+      password_hash: 'old-hashed',
+    });
+
+    jest.spyOn(bcrypt, 'compare').mockResolvedValue(true);
+    jest.spyOn(bcrypt, 'hash').mockResolvedValue('new-hashed');
+    repo.save.mockResolvedValue({});
+
+    const result = await service.changePassword('uuid-1', {
+      oldPassword: 'oldpass123',
+      newPassword: 'newpass123',
+    });
+
+    expect(result.message).toBeDefined();
+  });
+
+  it('should reject change password with wrong old password', async () => {
+    repo.findOne.mockResolvedValue({
+      id: 'uuid-1',
+      password_hash: 'old-hashed',
+    });
+
+    jest.spyOn(bcrypt, 'compare').mockResolvedValue(false);
+
+    await expect(
+      service.changePassword('uuid-1', {
+        oldPassword: 'wrongpass',
+        newPassword: 'newpass123',
+      }),
+    ).rejects.toThrow('Mật khẩu cũ không đúng');
   });
 });
