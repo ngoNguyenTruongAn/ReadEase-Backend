@@ -27,9 +27,13 @@ const UserEntity = new EntitySchema({
       type: 'varchar',
       length: 20,
     },
+    email_verified: {
+      type: 'boolean',
+      default: false,
+    },
     is_active: {
       type: 'boolean',
-      default: true,
+      default: false,
     },
     last_login_at: {
       type: 'timestamptz',

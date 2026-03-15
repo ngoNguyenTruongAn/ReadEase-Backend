@@ -12,6 +12,8 @@ const { AuthService } = require('./auth.service');
 const { JwtService } = require('@nestjs/jwt');
 const { getRepositoryToken } = require('@nestjs/typeorm');
 const { UserEntity } = require('../users/entities/user.entity');
+const { OtpService } = require('./services/otp.service');
+const { EmailService } = require('./services/email.service');
 const { RolesGuard } = require('./guards/roles.guard');
 const { Reflector } = require('@nestjs/core');
 const bcrypt = require('bcrypt');
@@ -24,6 +26,16 @@ describe('Auth — RBAC & Guards', () => {
     findOne: jest.fn(),
     create: jest.fn(),
     save: jest.fn(),
+    remove: jest.fn(),
+  };
+
+  const mockOtpService = {
+    createOTP: jest.fn().mockResolvedValue('123456'),
+    verifyOTP: jest.fn().mockResolvedValue(true),
+  };
+
+  const mockEmailService = {
+    sendOTP: jest.fn().mockResolvedValue(undefined),
   };
 
   const realJwtService = new JwtService({
@@ -42,6 +54,14 @@ describe('Auth — RBAC & Guards', () => {
           provide: JwtService,
           useValue: realJwtService,
         },
+        {
+          provide: OtpService,
+          useValue: mockOtpService,
+        },
+        {
+          provide: EmailService,
+          useValue: mockEmailService,
+        },
       ],
     }).compile();
 
@@ -54,38 +74,36 @@ describe('Auth — RBAC & Guards', () => {
   // ─────────────────── Register Tests ───────────────────
 
   describe('register()', () => {
-    it('should register a new user and return tokens', async () => {
+    it('should register a new user and send OTP (no tokens returned)', async () => {
       mockRepo.findOne.mockResolvedValue(null);
       jest.spyOn(bcrypt, 'hash').mockResolvedValue('hashed-pw');
       mockRepo.create.mockReturnValue({
         id: 'user-1',
         email: 'test@test.com',
-        role: 'ROLE_CHILD',
+        role: 'ROLE_GUARDIAN',
+        email_verified: false,
+        is_active: false,
       });
       mockRepo.save.mockResolvedValue({
         id: 'user-1',
         email: 'test@test.com',
-        role: 'ROLE_CHILD',
+        role: 'ROLE_GUARDIAN',
       });
 
       const result = await authService.register({
         email: 'test@test.com',
         password: 'password123',
         displayName: 'Test User',
-        role: 'ROLE_CHILD',
       });
 
-      expect(result.accessToken).toBeDefined();
-      expect(result.refreshToken).toBeDefined();
-      expect(result.user).toEqual({
-        id: 'user-1',
-        email: 'test@test.com',
-        role: 'ROLE_CHILD',
-      });
+      expect(result.message).toBeDefined();
+      expect(result.email).toBe('test@test.com');
+      // Should NOT return tokens (pending OTP verification)
+      expect(result.accessToken).toBeUndefined();
     });
 
-    it('should throw ConflictException if email already exists', async () => {
-      mockRepo.findOne.mockResolvedValue({ id: 'existing-user' });
+    it('should throw ConflictException if verified email already exists', async () => {
+      mockRepo.findOne.mockResolvedValue({ id: 'existing-user', email_verified: true });
 
       await expect(
         authService.register({
@@ -93,10 +111,10 @@ describe('Auth — RBAC & Guards', () => {
           password: 'password123',
           displayName: 'Test',
         }),
-      ).rejects.toThrow('Email already exists');
+      ).rejects.toThrow('Email này đã được đăng ký');
     });
 
-    it('should default to ROLE_GUARDIAN if no role provided', async () => {
+    it('should default to ROLE_GUARDIAN', async () => {
       mockRepo.findOne.mockResolvedValue(null);
       jest.spyOn(bcrypt, 'hash').mockResolvedValue('hashed-pw');
       mockRepo.create.mockImplementation((data) => ({
@@ -106,27 +124,32 @@ describe('Auth — RBAC & Guards', () => {
       }));
       mockRepo.save.mockImplementation((user) => Promise.resolve(user));
 
-      const result = await authService.register({
+      await authService.register({
         email: 'guardian@test.com',
         password: 'password123',
         displayName: 'Guardian User',
       });
 
-      expect(result.user.role).toBe('ROLE_GUARDIAN');
+      expect(mockRepo.create).toHaveBeenCalledWith(
+        expect.objectContaining({ role: 'ROLE_GUARDIAN' }),
+      );
     });
   });
 
   // ─────────────────── Login Tests ───────────────────
 
   describe('login()', () => {
-    it('should return tokens on valid credentials', async () => {
+    it('should return tokens on valid credentials (verified user)', async () => {
       mockRepo.findOne.mockResolvedValue({
         id: 'user-1',
         email: 'test@test.com',
         password_hash: 'hashed-pw',
         role: 'ROLE_CLINICIAN',
+        email_verified: true,
+        is_active: true,
       });
       jest.spyOn(bcrypt, 'compare').mockResolvedValue(true);
+      mockRepo.save.mockResolvedValue({});
 
       const result = await authService.login({
         email: 'test@test.com',
@@ -146,7 +169,7 @@ describe('Auth — RBAC & Guards', () => {
           email: 'nonexist@test.com',
           password: 'password123',
         }),
-      ).rejects.toThrow('Invalid credentials');
+      ).rejects.toThrow('Email hoặc mật khẩu không đúng');
     });
 
     it('should throw UnauthorizedException for wrong password', async () => {
@@ -155,6 +178,8 @@ describe('Auth — RBAC & Guards', () => {
         email: 'test@test.com',
         password_hash: 'hashed-pw',
         role: 'ROLE_CHILD',
+        email_verified: true,
+        is_active: true,
       });
       jest.spyOn(bcrypt, 'compare').mockResolvedValue(false);
 
@@ -163,7 +188,23 @@ describe('Auth — RBAC & Guards', () => {
           email: 'test@test.com',
           password: 'wrongpassword',
         }),
-      ).rejects.toThrow('Invalid credentials');
+      ).rejects.toThrow('Email hoặc mật khẩu không đúng');
+    });
+
+    it('should reject login if email not verified', async () => {
+      mockRepo.findOne.mockResolvedValue({
+        id: 'user-1',
+        email: 'test@test.com',
+        email_verified: false,
+        is_active: false,
+      });
+
+      await expect(
+        authService.login({
+          email: 'test@test.com',
+          password: 'password123',
+        }),
+      ).rejects.toThrow('Vui lòng xác thực email');
     });
   });
 
@@ -296,8 +337,11 @@ describe('Auth — RBAC & Guards', () => {
         email: 'test@test.com',
         password_hash: 'hashed',
         role: 'ROLE_CHILD',
+        email_verified: true,
+        is_active: true,
       });
       jest.spyOn(bcrypt, 'compare').mockResolvedValue(true);
+      mockRepo.save.mockResolvedValue({});
 
       const result = await authService.login({
         email: 'test@test.com',
@@ -313,8 +357,11 @@ describe('Auth — RBAC & Guards', () => {
         email: 'test@test.com',
         password_hash: 'hashed',
         role: 'ROLE_GUARDIAN',
+        email_verified: true,
+        is_active: true,
       });
       jest.spyOn(bcrypt, 'compare').mockResolvedValue(true);
+      mockRepo.save.mockResolvedValue({});
 
       const result = await authService.login({
         email: 'test@test.com',

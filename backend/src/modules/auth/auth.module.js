@@ -12,12 +12,16 @@ const { JwtStrategy } = require('./strategies/jwt.strategy');
 const { RefreshStrategy } = require('./strategies/refresh.strategy');
 
 const { UserEntity } = require('../users/entities/user.entity');
+const { OtpCodeEntity } = require('./entities/otp-code.entity');
+
+const { OtpService } = require('./services/otp.service');
+const { EmailService } = require('./services/email.service');
 
 class AuthModule {}
 
 Module({
   imports: [
-    TypeOrmModule.forFeature([UserEntity]),
+    TypeOrmModule.forFeature([UserEntity, OtpCodeEntity]),
     JwtModule.registerAsync({
       inject: [ConfigService],
       useFactory: (configService) => ({
@@ -27,7 +31,7 @@ Module({
     }),
   ],
   controllers: [AuthController],
-  providers: [AuthService, JwtStrategy, RefreshStrategy],
+  providers: [AuthService, JwtStrategy, RefreshStrategy, OtpService, EmailService],
   exports: [AuthService],
 })(AuthModule);
 

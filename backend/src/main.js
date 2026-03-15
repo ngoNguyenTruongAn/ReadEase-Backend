@@ -10,7 +10,7 @@ const { WsAdapter } = require('@nestjs/platform-ws');
 async function bootstrap() {
   const app = await NestFactory.create(AppModule);
   app.useWebSocketAdapter(new WsAdapter(app));
-  
+
   const configService = app.get(ConfigService);
   const port = configService.get('app.port', 3000);
   const env = configService.get('app.env', 'development');

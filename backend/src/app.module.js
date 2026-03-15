@@ -9,7 +9,7 @@ const { configModules, validationSchema, validationOptions } = require('./config
 const { LoggingInterceptor } = require('./common/interceptors/logging.interceptor');
 const { requestIdMiddleware } = require('./common/middleware/request-id.middleware');
 const { HealthModule } = require('./modules/health/health.module');
-const {TrackingModule} = require('./modules/tracking/tracking.module');
+const { TrackingModule } = require('./modules/tracking/tracking.module');
 // ── Entity imports ──
 const { UserEntity } = require('./modules/users/entities/user.entity');
 const { ChildrenProfileEntity } = require('./modules/users/entities/children-profile.entity');
@@ -23,6 +23,7 @@ const { TokenEntity } = require('./modules/gamification/entities/token.entity');
 const { RewardEntity } = require('./modules/gamification/entities/reward.entity');
 const { RedemptionEntity } = require('./modules/gamification/entities/redemption.entity');
 const { ReportEntity } = require('./modules/reports/entities/report.entity');
+const { OtpCodeEntity } = require('./modules/auth/entities/otp-code.entity');
 const { AuthModule } = require('./modules/auth/auth.module');
 
 const entities = [
@@ -36,6 +37,7 @@ const entities = [
   RewardEntity,
   RedemptionEntity,
   ReportEntity,
+  OtpCodeEntity,
 ];
 
 /** @type {import('@nestjs/common').ModuleMetadata} */
