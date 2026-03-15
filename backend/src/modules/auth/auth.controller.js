@@ -21,6 +21,7 @@ const {
   Body,
   Req,
   UseGuards,
+  HttpCode,
   BadRequestException,
   Inject,
 } = require('@nestjs/common');
@@ -124,34 +125,40 @@ class AuthController {
 Controller('api/v1/auth')(AuthController);
 Inject(AuthService)(AuthController, undefined, 0);
 
-// ── POST /auth/register (Public) ──
-Post('register')(
+// ── POST /auth/register (Public) → 201 Created ──
+const registerDescriptor = Object.getOwnPropertyDescriptor(AuthController.prototype, 'register');
+Reflect.decorate(
+  [Post('register'), HttpCode(201)],
   AuthController.prototype,
   'register',
-  Object.getOwnPropertyDescriptor(AuthController.prototype, 'register'),
+  registerDescriptor,
 );
 Body()(AuthController.prototype, 'register', 0);
 
-// ── POST /auth/verify-email (Public) ──
-Post('verify-email')(
+// ── POST /auth/verify-email (Public) → 200 OK ──
+const verifyEmailDescriptor = Object.getOwnPropertyDescriptor(AuthController.prototype, 'verifyEmail');
+Reflect.decorate(
+  [Post('verify-email'), HttpCode(200)],
   AuthController.prototype,
   'verifyEmail',
-  Object.getOwnPropertyDescriptor(AuthController.prototype, 'verifyEmail'),
+  verifyEmailDescriptor,
 );
 Body()(AuthController.prototype, 'verifyEmail', 0);
 
-// ── POST /auth/resend-otp (Public) ──
-Post('resend-otp')(
+// ── POST /auth/resend-otp (Public) → 200 OK ──
+const resendOtpDescriptor = Object.getOwnPropertyDescriptor(AuthController.prototype, 'resendOtp');
+Reflect.decorate(
+  [Post('resend-otp'), HttpCode(200)],
   AuthController.prototype,
   'resendOtp',
-  Object.getOwnPropertyDescriptor(AuthController.prototype, 'resendOtp'),
+  resendOtpDescriptor,
 );
 Body()(AuthController.prototype, 'resendOtp', 0);
 
-// ── POST /auth/set-role (Protected: JwtAuthGuard) ──
+// ── POST /auth/set-role (Protected: JwtAuthGuard) → 200 OK ──
 const setRoleDescriptor = Object.getOwnPropertyDescriptor(AuthController.prototype, 'setRole');
 Reflect.decorate(
-  [Post('set-role'), UseGuards(JwtAuthGuard)],
+  [Post('set-role'), HttpCode(200), UseGuards(JwtAuthGuard)],
   AuthController.prototype,
   'setRole',
   setRoleDescriptor,
@@ -159,18 +166,20 @@ Reflect.decorate(
 Req()(AuthController.prototype, 'setRole', 0);
 Body()(AuthController.prototype, 'setRole', 1);
 
-// ── POST /auth/login (Public) ──
-Post('login')(
+// ── POST /auth/login (Public) → 200 OK ──
+const loginDescriptor = Object.getOwnPropertyDescriptor(AuthController.prototype, 'login');
+Reflect.decorate(
+  [Post('login'), HttpCode(200)],
   AuthController.prototype,
   'login',
-  Object.getOwnPropertyDescriptor(AuthController.prototype, 'login'),
+  loginDescriptor,
 );
 Body()(AuthController.prototype, 'login', 0);
 
-// ── POST /auth/refresh (Protected: JwtAuthGuard) ──
+// ── POST /auth/refresh (Protected: JwtAuthGuard) → 200 OK ──
 const refreshDescriptor = Object.getOwnPropertyDescriptor(AuthController.prototype, 'refresh');
 Reflect.decorate(
-  [Post('refresh'), UseGuards(JwtAuthGuard)],
+  [Post('refresh'), HttpCode(200), UseGuards(JwtAuthGuard)],
   AuthController.prototype,
   'refresh',
   refreshDescriptor,
@@ -191,19 +200,23 @@ Reflect.decorate(
 );
 Req()(AuthController.prototype, 'getProfile', 0);
 
-// ── POST /auth/forgot-password (Public) ──
-Post('forgot-password')(
+// ── POST /auth/forgot-password (Public) → 200 OK ──
+const forgotPasswordDescriptor = Object.getOwnPropertyDescriptor(AuthController.prototype, 'forgotPassword');
+Reflect.decorate(
+  [Post('forgot-password'), HttpCode(200)],
   AuthController.prototype,
   'forgotPassword',
-  Object.getOwnPropertyDescriptor(AuthController.prototype, 'forgotPassword'),
+  forgotPasswordDescriptor,
 );
 Body()(AuthController.prototype, 'forgotPassword', 0);
 
-// ── POST /auth/reset-password (Public) ──
-Post('reset-password')(
+// ── POST /auth/reset-password (Public) → 200 OK ──
+const resetPasswordDescriptor = Object.getOwnPropertyDescriptor(AuthController.prototype, 'resetPassword');
+Reflect.decorate(
+  [Post('reset-password'), HttpCode(200)],
   AuthController.prototype,
   'resetPassword',
-  Object.getOwnPropertyDescriptor(AuthController.prototype, 'resetPassword'),
+  resetPasswordDescriptor,
 );
 Body()(AuthController.prototype, 'resetPassword', 0);
 
@@ -213,7 +226,7 @@ const changePasswordDescriptor = Object.getOwnPropertyDescriptor(
   'changePassword',
 );
 Reflect.decorate(
-  [Post('change-password'), UseGuards(JwtAuthGuard)],
+  [Post('change-password'), HttpCode(200), UseGuards(JwtAuthGuard)],
   AuthController.prototype,
   'changePassword',
   changePasswordDescriptor,
