@@ -4,10 +4,7 @@
  * Generates, stores, and verifies 6-digit OTP codes.
  * Uses TypeORM repository for otp_codes table.
  */
-const {
-  Injectable,
-  BadRequestException,
-} = require('@nestjs/common');
+const { Injectable, BadRequestException } = require('@nestjs/common');
 const { InjectRepository } = require('@nestjs/typeorm');
 const { OtpCodeEntity } = require('../entities/otp-code.entity');
 const { logger } = require('../../../common/logger/winston.config');
@@ -37,10 +34,7 @@ class OtpService {
    */
   async createOTP(userId, type) {
     // Invalidate previous unused OTPs of same type
-    await this.otpRepository.update(
-      { user: { id: userId }, type, used: false },
-      { used: true },
-    );
+    await this.otpRepository.update({ user: { id: userId }, type, used: false }, { used: true });
 
     const code = this.generateCode();
 

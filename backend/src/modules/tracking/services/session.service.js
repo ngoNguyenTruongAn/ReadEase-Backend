@@ -1,17 +1,14 @@
-const { Injectable } = require("@nestjs/common");
-const { InjectDataSource } = require("@nestjs/typeorm");
-const { logger } = require("../../../common/logger/winston.config");
+const { Injectable } = require('@nestjs/common');
+const { InjectDataSource } = require('@nestjs/typeorm');
+const { logger } = require('../../../common/logger/winston.config');
 
 class SessionService {
-
   constructor(dataSource) {
     this.dataSource = dataSource;
   }
 
   async ensureSession(sessionId, userId, contentId) {
-
     try {
-
       await this.dataSource.query(
         `
         INSERT INTO reading_sessions
@@ -19,28 +16,18 @@ class SessionService {
         VALUES ($1,$2,$3,'ACTIVE')
         ON CONFLICT (id) DO NOTHING
         `,
-        [
-          sessionId,
-          userId,
-          contentId
-        ]
+        [sessionId, userId, contentId],
       );
-
     } catch (err) {
-
-      logger.error("ensureSession failed", {
-        context: "SessionService",
-        data: { sessionId, error: err.message }
+      logger.error('ensureSession failed', {
+        context: 'SessionService',
+        data: { sessionId, error: err.message },
       });
-
     }
-
   }
 
   async endSession(sessionId) {
-
     try {
-
       await this.dataSource.query(
         `
         UPDATE reading_sessions
@@ -48,20 +35,15 @@ class SessionService {
             ended_at=NOW()
         WHERE id=$1
         `,
-        [sessionId]
+        [sessionId],
       );
-
     } catch (err) {
-
-      logger.error("endSession failed", {
-        context: "SessionService",
-        data: { sessionId, error: err.message }
+      logger.error('endSession failed', {
+        context: 'SessionService',
+        data: { sessionId, error: err.message },
       });
-
     }
-
   }
-
 }
 
 Injectable()(SessionService);

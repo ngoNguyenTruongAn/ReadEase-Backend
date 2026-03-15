@@ -17,11 +17,7 @@ class EmailService {
     this.fromAddress = process.env.SMTP_FROM || 'ReadEase <noreply@readease.app>';
 
     this.isDev =
-      !host ||
-      !user ||
-      !pass ||
-      user === 'your-email@gmail.com' ||
-      pass === 'your-app-password';
+      !host || !user || !pass || user === 'your-email@gmail.com' || pass === 'your-app-password';
 
     if (!this.isDev) {
       this.transporter = nodemailer.createTransport({
@@ -41,14 +37,9 @@ class EmailService {
    */
   async sendOTP(to, code, type) {
     const subject =
-      type === 'EMAIL_VERIFY'
-        ? 'ReadEase — Xác thực tài khoản'
-        : 'ReadEase — Đặt lại mật khẩu';
+      type === 'EMAIL_VERIFY' ? 'ReadEase — Xác thực tài khoản' : 'ReadEase — Đặt lại mật khẩu';
 
-    const heading =
-      type === 'EMAIL_VERIFY'
-        ? 'Xác thực tài khoản của bạn'
-        : 'Đặt lại mật khẩu';
+    const heading = type === 'EMAIL_VERIFY' ? 'Xác thực tài khoản của bạn' : 'Đặt lại mật khẩu';
 
     const description =
       type === 'EMAIL_VERIFY'

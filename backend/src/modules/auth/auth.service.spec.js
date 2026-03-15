@@ -152,9 +152,9 @@ describe('AuthService', () => {
       is_active: false,
     });
 
-    await expect(
-      service.login({ email: 'test@mail.com', password: '12345678' }),
-    ).rejects.toThrow('Vui lòng xác thực email');
+    await expect(service.login({ email: 'test@mail.com', password: '12345678' })).rejects.toThrow(
+      'Vui lòng xác thực email',
+    );
   });
 
   it('should login successfully', async () => {
