@@ -25,6 +25,7 @@ const { RedemptionEntity } = require('./modules/gamification/entities/redemption
 const { ReportEntity } = require('./modules/reports/entities/report.entity');
 const { OtpCodeEntity } = require('./modules/auth/entities/otp-code.entity');
 const { AuthModule } = require('./modules/auth/auth.module');
+const { ReadingModule } = require('./modules/reading/reading.module');
 
 const entities = [
   UserEntity,
@@ -66,6 +67,7 @@ const metadata = {
     }),
     HealthModule,
     AuthModule,
+    ReadingModule,
     TrackingModule,
     ThrottlerModule.forRoot([
       {
