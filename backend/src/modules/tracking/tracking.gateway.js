@@ -15,12 +15,15 @@ const { verifyWebSocketJWT } = require('./utils/jwt-auth');
 const TrajectoryBufferService = require('./services/trajectory-buffer.service');
 const SessionService = require('./services/session.service');
 const ReplayStorageService = require('./services/replay-storage.service');
+const MlClientService = require('./services/ml-client.service');
+const { routeIntervention } = require('./utils/intervention-router');
 
 class TrackingGateway {
-  constructor(trajectoryBufferService, sessionService, replayStorageService) {
+  constructor(trajectoryBufferService, sessionService, replayStorageService, mlClientService) {
     this.trajectoryBuffer = trajectoryBufferService;
     this.sessionService = sessionService;
     this.replayStorage = replayStorageService;
+    this.mlClient = mlClientService;
   }
 
   handleConnection(client, request) {
@@ -92,6 +95,16 @@ class TrackingGateway {
       trajectory_events_received.inc(points.length);
 
       await this.trajectoryBuffer.push(client.session_id, client.user_id, points);
+
+      // ── ML Classification (async, non-blocking) ──
+      if (points.length >= 3) {
+        this.classifyAndRoute(client, points).catch((err) => {
+          logger.error('ML classify pipeline error', {
+            context: 'TrackingGateway',
+            data: { error: err.message, sessionId: client.session_id },
+          });
+        });
+      }
     } catch (err) {
       logger.error('mouse batch failed', {
         context: 'TrackingGateway',
@@ -100,6 +113,44 @@ class TrackingGateway {
     }
 
     end();
+  }
+
+  /**
+   * ML Classification pipeline:
+   * 1. Extract features + call ML Engine
+   * 2. Route intervention to client via WebSocket
+   * 3. Store cognitive state in session_replay_events
+   */
+  async classifyAndRoute(client, points) {
+    const mlResult = await this.mlClient.classify(client.session_id, points);
+
+    // Route intervention to client
+    const interventionType = routeIntervention(client, mlResult);
+
+    // Store cognitive state event in DB for clinician replay
+    await this.replayStorage.storeEvents(client.session_id, [
+      {
+        type: 'COGNITIVE_STATE',
+        userId: client.user_id,
+        timestamp: Date.now(),
+        state: mlResult.state,
+        confidence: mlResult.confidence,
+        source: mlResult.source,
+        interventionType: interventionType || 'NONE',
+      },
+    ]);
+
+    if (interventionType) {
+      logger.info('Intervention sent', {
+        context: 'TrackingGateway',
+        data: {
+          sessionId: client.session_id,
+          state: mlResult.state,
+          interventionType,
+          source: mlResult.source,
+        },
+      });
+    }
   }
 
   /* =========================
@@ -219,6 +270,7 @@ Injectable()(TrackingGateway);
 Inject(TrajectoryBufferService)(TrackingGateway, undefined, 0);
 Inject(SessionService)(TrackingGateway, undefined, 1);
 Inject(ReplayStorageService)(TrackingGateway, undefined, 2);
+Inject(MlClientService)(TrackingGateway, undefined, 3);
 
 Reflect.decorate([WebSocketGateway({ path: '/tracking', cors: true })], TrackingGateway);
 
