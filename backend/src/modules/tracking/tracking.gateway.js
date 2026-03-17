@@ -1,6 +1,6 @@
 const { WebSocketGateway, SubscribeMessage } = require('@nestjs/websockets');
-
 const { Injectable, Inject } = require('@nestjs/common');
+const { DataSource } = require('typeorm');
 
 const { logger } = require('../../common/logger/winston.config');
 
@@ -19,11 +19,12 @@ const MlClientService = require('./services/ml-client.service');
 const { routeIntervention } = require('./utils/intervention-router');
 
 class TrackingGateway {
-  constructor(trajectoryBufferService, sessionService, replayStorageService, mlClientService) {
+  constructor(trajectoryBufferService, sessionService, replayStorageService, mlClientService, dataSource) {
     this.trajectoryBuffer = trajectoryBufferService;
     this.sessionService = sessionService;
     this.replayStorage = replayStorageService;
     this.mlClient = mlClientService;
+    this.dataSource = dataSource;
   }
 
   handleConnection(client, request) {
@@ -188,7 +189,7 @@ class TrackingGateway {
         gameType: payload?.gameType || 'target_tracking',
       };
 
-      // Store as session_replay_event
+      // Store calibration events in session_replay_events
       await this.replayStorage.storeEvents(client.session_id, [
         {
           type: 'calibration',
@@ -198,21 +199,75 @@ class TrackingGateway {
         },
       ]);
 
+      // ── Call ML /calibrate to compute motor baseline ──
+      let baselineResult = null;
+      if (calibrationData.events.length >= 3) {
+        try {
+          baselineResult = await this.mlClient.calibrate(
+            calibrationData.childId,
+            calibrationData.events,
+          );
+
+          // Save baseline_json to children_profiles
+          if (baselineResult?.baseline) {
+            const repo = this.dataSource?.getRepository('ChildrenProfile');
+            if (repo) {
+              const profile = await repo.findOne({
+                where: { user_id: calibrationData.childId },
+              });
+
+              if (profile) {
+                await repo.update(profile.id, {
+                  baseline_json: baselineResult.baseline,
+                });
+                logger.info('Baseline saved to children_profiles', {
+                  context: 'TrackingGateway',
+                  data: {
+                    childId: calibrationData.childId,
+                    motorProfile: baselineResult.baseline.motor_profile,
+                    source: baselineResult.source,
+                  },
+                });
+              } else {
+                logger.warn('No children_profile found for user, creating one', {
+                  context: 'TrackingGateway',
+                  data: { userId: calibrationData.childId },
+                });
+                await repo.save({
+                  user_id: calibrationData.childId,
+                  baseline_json: baselineResult.baseline,
+                });
+              }
+            }
+          }
+        } catch (mlErr) {
+          logger.error('Calibration ML pipeline failed', {
+            context: 'TrackingGateway',
+            data: { error: mlErr.message },
+          });
+        }
+      }
+
       logger.info('Calibration data received', {
         context: 'TrackingGateway',
         data: {
           sessionId: client.session_id,
           eventsCount: calibrationData.events.length,
           duration: calibrationData.duration,
+          baseline: baselineResult?.baseline?.motor_profile || 'not_computed',
         },
       });
 
-      // Send acknowledgement back to client
+      // Send acknowledgement back to client with baseline
       if (client.readyState === 1) {
         client.send(
           JSON.stringify({
             event: 'calibration:ack',
-            data: { status: 'received', sessionId: client.session_id },
+            data: {
+              status: 'received',
+              sessionId: client.session_id,
+              baseline: baselineResult?.baseline || null,
+            },
           }),
         );
       }
@@ -271,6 +326,7 @@ Inject(TrajectoryBufferService)(TrackingGateway, undefined, 0);
 Inject(SessionService)(TrackingGateway, undefined, 1);
 Inject(ReplayStorageService)(TrackingGateway, undefined, 2);
 Inject(MlClientService)(TrackingGateway, undefined, 3);
+Inject(DataSource)(TrackingGateway, undefined, 4);
 
 Reflect.decorate([WebSocketGateway({ path: '/tracking', cors: true })], TrackingGateway);
 

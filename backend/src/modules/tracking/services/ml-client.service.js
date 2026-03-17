@@ -107,6 +107,88 @@ class MlClientService {
       source: 'fallback_threshold',
     };
   }
+
+  /**
+   * Call Python ML /calibrate to compute motor baseline.
+   *
+   * @param {string} childId
+   * @param {Array<{x: number, y: number, timestamp: number}>} events - min 10
+   * @returns {Promise<{child_id: string, baseline: object, source: string}>}
+   */
+  async calibrate(childId, events) {
+    const calibrateUrl = `${ML_URL}/calibrate`;
+
+    try {
+      const response = await this.httpService.axiosRef.post(
+        calibrateUrl,
+        { child_id: childId, events },
+        { timeout: ML_TIMEOUT * 2, headers: { 'Content-Type': 'application/json' } },
+      );
+
+      logger.info('ML calibrate success', {
+        context: 'MlClientService',
+        data: {
+          childId,
+          motorProfile: response.data.baseline?.motor_profile,
+        },
+      });
+
+      return {
+        child_id: childId,
+        baseline: response.data.baseline,
+        source: 'ml_model',
+      };
+    } catch (err) {
+      logger.warn('ML calibrate failed, using fallback baseline', {
+        context: 'MlClientService',
+        data: { childId, error: err.message },
+      });
+
+      return this.fallbackCalibrate(childId, events);
+    }
+  }
+
+  /**
+   * Fallback baseline when ML /calibrate is unavailable.
+   */
+  fallbackCalibrate(childId, events) {
+    if (!events || events.length < 3) {
+      return {
+        child_id: childId,
+        baseline: { motor_profile: 'NORMAL', velocity_baseline: 0, calibrated_at: new Date().toISOString() },
+        source: 'fallback_default',
+      };
+    }
+
+    // Calculate basic velocity from events
+    let totalVelocity = 0;
+    let count = 0;
+    for (let i = 1; i < events.length; i++) {
+      const dx = (events[i].x || 0) - (events[i - 1].x || 0);
+      const dy = (events[i].y || 0) - (events[i - 1].y || 0);
+      const dt = (events[i].timestamp || 0) - (events[i - 1].timestamp || 0);
+      if (dt > 0) {
+        totalVelocity += Math.sqrt(dx * dx + dy * dy) / dt;
+        count++;
+      }
+    }
+
+    const avgVelocity = count > 0 ? totalVelocity / count : 0;
+    let motorProfile = 'NORMAL';
+    if (avgVelocity < 0.3) motorProfile = 'SLOW';
+    else if (avgVelocity > 1.0) motorProfile = 'FAST';
+
+    return {
+      child_id: childId,
+      baseline: {
+        velocity_baseline: parseFloat(avgVelocity.toFixed(4)),
+        velocity_range: [0, parseFloat((avgVelocity * 2).toFixed(4))],
+        motor_profile: motorProfile,
+        calibrated_at: new Date().toISOString(),
+      },
+      source: 'fallback_calculated',
+    };
+  }
 }
 
 Injectable()(MlClientService);

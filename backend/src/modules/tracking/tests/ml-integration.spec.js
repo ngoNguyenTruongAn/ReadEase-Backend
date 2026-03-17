@@ -218,9 +218,7 @@ describe('MlClientService', () => {
   });
 
   it('should fallback on ML timeout/error', async () => {
-    mockHttpService.axiosRef.post.mockRejectedValue(
-      new Error('timeout of 3000ms exceeded'),
-    );
+    mockHttpService.axiosRef.post.mockRejectedValue(new Error('timeout of 3000ms exceeded'));
 
     const points = [
       { x: 0, y: 0, timestamp: 0 },
