@@ -136,7 +136,10 @@ Reflect.decorate(
 Body()(AuthController.prototype, 'register', 0);
 
 // ── POST /auth/verify-email (Public) → 200 OK ──
-const verifyEmailDescriptor = Object.getOwnPropertyDescriptor(AuthController.prototype, 'verifyEmail');
+const verifyEmailDescriptor = Object.getOwnPropertyDescriptor(
+  AuthController.prototype,
+  'verifyEmail',
+);
 Reflect.decorate(
   [Post('verify-email'), HttpCode(200)],
   AuthController.prototype,
@@ -201,7 +204,10 @@ Reflect.decorate(
 Req()(AuthController.prototype, 'getProfile', 0);
 
 // ── POST /auth/forgot-password (Public) → 200 OK ──
-const forgotPasswordDescriptor = Object.getOwnPropertyDescriptor(AuthController.prototype, 'forgotPassword');
+const forgotPasswordDescriptor = Object.getOwnPropertyDescriptor(
+  AuthController.prototype,
+  'forgotPassword',
+);
 Reflect.decorate(
   [Post('forgot-password'), HttpCode(200)],
   AuthController.prototype,
@@ -211,7 +217,10 @@ Reflect.decorate(
 Body()(AuthController.prototype, 'forgotPassword', 0);
 
 // ── POST /auth/reset-password (Public) → 200 OK ──
-const resetPasswordDescriptor = Object.getOwnPropertyDescriptor(AuthController.prototype, 'resetPassword');
+const resetPasswordDescriptor = Object.getOwnPropertyDescriptor(
+  AuthController.prototype,
+  'resetPassword',
+);
 Reflect.decorate(
   [Post('reset-password'), HttpCode(200)],
   AuthController.prototype,
