@@ -35,6 +35,16 @@ class ContentRepository {
     const offset = (page - 1) * limit;
 
     return this.buildFiltersQuery(filters)
+      .select([
+        'content.id',
+        'content.title',
+        'content.difficulty',
+        'content.age_group',
+        'content.word_count',
+        'content.cover_image_url',
+        'content.created_by',
+        'content.created_at',
+      ])
       .orderBy('content.created_at', 'DESC')
       .limit(limit)
       .offset(offset)

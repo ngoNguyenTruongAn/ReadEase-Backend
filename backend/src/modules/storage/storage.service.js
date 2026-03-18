@@ -74,7 +74,9 @@ class StorageService {
    */
   async upload(fileBuffer, originalName, mimeType, folder = 'general') {
     if (!this.supabase) {
-      throw new Error('Supabase Storage chưa được cấu hình. Vui lòng thêm SUPABASE_URL và SUPABASE_SERVICE_KEY vào .env');
+      throw new Error(
+        'Supabase Storage chưa được cấu hình. Vui lòng thêm SUPABASE_URL và SUPABASE_SERVICE_KEY vào .env',
+      );
     }
 
     // Generate unique filename: folder/timestamp-originalname
@@ -82,12 +84,10 @@ class StorageService {
     const safeName = originalName.replace(/[^a-zA-Z0-9.\-_]/g, '_');
     const key = `${folder}/${timestamp}-${safeName}`;
 
-    const { error } = await this.supabase.storage
-      .from(this.bucket)
-      .upload(key, fileBuffer, {
-        contentType: mimeType,
-        upsert: false,
-      });
+    const { error } = await this.supabase.storage.from(this.bucket).upload(key, fileBuffer, {
+      contentType: mimeType,
+      upsert: false,
+    });
 
     if (error) {
       logger.error('Upload failed', {
@@ -113,9 +113,7 @@ class StorageService {
   getPublicUrl(key) {
     if (!this.supabase) return null;
 
-    const { data } = this.supabase.storage
-      .from(this.bucket)
-      .getPublicUrl(key);
+    const { data } = this.supabase.storage.from(this.bucket).getPublicUrl(key);
 
     return data?.publicUrl || null;
   }
@@ -130,9 +128,7 @@ class StorageService {
       throw new Error('Supabase Storage chưa được cấu hình');
     }
 
-    const { error } = await this.supabase.storage
-      .from(this.bucket)
-      .remove([key]);
+    const { error } = await this.supabase.storage.from(this.bucket).remove([key]);
 
     if (error) {
       logger.error('Delete failed', {

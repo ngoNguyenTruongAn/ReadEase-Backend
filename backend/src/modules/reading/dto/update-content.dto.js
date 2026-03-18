@@ -6,6 +6,7 @@ class UpdateContentDto {
     body: Joi.string().trim().min(50).optional(),
     difficulty: Joi.string().valid('EASY', 'MEDIUM', 'HARD').optional(),
     age_group: Joi.string().trim().optional(),
+    cover_image_url: Joi.string().uri().max(500).optional().allow(null, ''),
   }).min(1);
 }
 

@@ -155,7 +155,11 @@ class MlClientService {
     if (!events || events.length < 3) {
       return {
         child_id: childId,
-        baseline: { motor_profile: 'NORMAL', velocity_baseline: 0, calibrated_at: new Date().toISOString() },
+        baseline: {
+          motor_profile: 'NORMAL',
+          velocity_baseline: 0,
+          calibrated_at: new Date().toISOString(),
+        },
         source: 'fallback_default',
       };
     }
