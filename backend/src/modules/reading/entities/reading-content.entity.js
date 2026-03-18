@@ -29,6 +29,11 @@ const ReadingContentEntity = new EntitySchema({
     word_count: {
       type: 'int',
     },
+    cover_image_url: {
+      type: 'varchar',
+      length: 500,
+      nullable: true,
+    },
     created_by: {
       type: 'uuid',
       nullable: true,

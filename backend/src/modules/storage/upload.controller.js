@@ -43,7 +43,12 @@ const multerOptions = {
     if (ALLOWED_TYPES.includes(file.mimetype)) {
       cb(null, true);
     } else {
-      cb(new BadRequestException(`Loại file không hỗ trợ: ${file.mimetype}. Chỉ chấp nhận: ${ALLOWED_TYPES.join(', ')}`), false);
+      cb(
+        new BadRequestException(
+          `Loại file không hỗ trợ: ${file.mimetype}. Chỉ chấp nhận: ${ALLOWED_TYPES.join(', ')}`,
+        ),
+        false,
+      );
     }
   },
 };
@@ -171,7 +176,12 @@ const uploadFileDescriptor = Object.getOwnPropertyDescriptor(
   'uploadFile',
 );
 Reflect.decorate(
-  [Post(), HttpCode(200), UseGuards(JwtAuthGuard), UseInterceptors(FileInterceptor('file', multerOptions))],
+  [
+    Post(),
+    HttpCode(200),
+    UseGuards(JwtAuthGuard),
+    UseInterceptors(FileInterceptor('file', multerOptions)),
+  ],
   UploadController.prototype,
   'uploadFile',
   uploadFileDescriptor,
@@ -184,7 +194,12 @@ const uploadMultipleDescriptor = Object.getOwnPropertyDescriptor(
   'uploadMultiple',
 );
 Reflect.decorate(
-  [Post('multiple'), HttpCode(200), UseGuards(JwtAuthGuard), UseInterceptors(FilesInterceptor('files', 5, multerOptions))],
+  [
+    Post('multiple'),
+    HttpCode(200),
+    UseGuards(JwtAuthGuard),
+    UseInterceptors(FilesInterceptor('files', 5, multerOptions)),
+  ],
   UploadController.prototype,
   'uploadMultiple',
   uploadMultipleDescriptor,

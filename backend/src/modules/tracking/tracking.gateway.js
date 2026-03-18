@@ -19,7 +19,13 @@ const MlClientService = require('./services/ml-client.service');
 const { routeIntervention } = require('./utils/intervention-router');
 
 class TrackingGateway {
-  constructor(trajectoryBufferService, sessionService, replayStorageService, mlClientService, dataSource) {
+  constructor(
+    trajectoryBufferService,
+    sessionService,
+    replayStorageService,
+    mlClientService,
+    dataSource,
+  ) {
     this.trajectoryBuffer = trajectoryBufferService;
     this.sessionService = sessionService;
     this.replayStorage = replayStorageService;

@@ -14,6 +14,9 @@ class ContentService {
     return body.trim().split(/\s+/).length;
   }
 
+  /**
+   * Full serialization (with body) — for GET /content/:id
+   */
   serializeContent(content) {
     return {
       id: content.id,
@@ -22,6 +25,22 @@ class ContentService {
       difficulty: content.difficulty,
       age_group: content.age_group,
       word_count: content.word_count,
+      cover_image_url: content.cover_image_url || null,
+      created_at: content.created_at,
+    };
+  }
+
+  /**
+   * Summary serialization (no body) — for GET /content (list)
+   */
+  serializeContentSummary(content) {
+    return {
+      id: content.id,
+      title: content.title,
+      difficulty: content.difficulty,
+      age_group: content.age_group,
+      word_count: content.word_count,
+      cover_image_url: content.cover_image_url || null,
       created_at: content.created_at,
     };
   }
@@ -35,7 +54,7 @@ class ContentService {
     const totalPages = total === 0 ? 0 : Math.ceil(total / filters.limit);
 
     return {
-      data: items.map((item) => this.serializeContent(item)),
+      data: items.map((item) => this.serializeContentSummary(item)),
       meta: {
         page: filters.page,
         limit: filters.limit,
@@ -52,6 +71,7 @@ class ContentService {
       difficulty: dto.difficulty,
       age_group: dto.age_group,
       word_count: this.calculateWordCount(dto.body),
+      cover_image_url: dto.cover_image_url || null,
       created_by: user.sub,
     });
 
