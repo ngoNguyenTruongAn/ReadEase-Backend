@@ -118,7 +118,7 @@ describe('AuthService', () => {
         password: '12345678',
         displayName: 'Test',
       }),
-    ).rejects.toThrow('Email này đã được đăng ký');
+    ).rejects.toThrow('This email is already registered');
   });
 
   // ── Verify Email ──
@@ -153,7 +153,7 @@ describe('AuthService', () => {
     });
 
     await expect(service.login({ email: 'test@mail.com', password: '12345678' })).rejects.toThrow(
-      'Vui lòng xác thực email',
+      'Please verify your email',
     );
   });
 
@@ -246,6 +246,6 @@ describe('AuthService', () => {
         oldPassword: 'wrongpass',
         newPassword: 'newpass123',
       }),
-    ).rejects.toThrow('Mật khẩu cũ không đúng');
+    ).rejects.toThrow('Old password is incorrect');
   });
 });

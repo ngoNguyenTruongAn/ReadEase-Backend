@@ -8,11 +8,11 @@ class ResetPasswordDto {
       .pattern(/^\d{6}$/)
       .required()
       .messages({
-        'string.length': 'Mã OTP phải có 6 chữ số',
-        'string.pattern.base': 'Mã OTP phải là 6 chữ số',
+        'string.length': 'OTP code must be 6 digits',
+        'string.pattern.base': 'OTP code must be 6 digits',
       }),
     newPassword: Joi.string().min(8).required().messages({
-      'string.min': 'Mật khẩu mới phải ít nhất 8 ký tự',
+      'string.min': 'New password must be at least 8 characters',
     }),
   });
 }

@@ -75,7 +75,7 @@ class StorageService {
   async upload(fileBuffer, originalName, mimeType, folder = 'general') {
     if (!this.supabase) {
       throw new Error(
-        'Supabase Storage chưa được cấu hình. Vui lòng thêm SUPABASE_URL và SUPABASE_SERVICE_KEY vào .env',
+        'Supabase Storage is not configured. Please add SUPABASE_URL and SUPABASE_SERVICE_KEY to .env',
       );
     }
 
@@ -94,7 +94,7 @@ class StorageService {
         context: 'StorageService',
         data: { key, error: error.message },
       });
-      throw new Error(`Upload thất bại: ${error.message}`);
+      throw new Error(`Upload failed: ${error.message}`);
     }
 
     const url = this.getPublicUrl(key);
@@ -125,7 +125,7 @@ class StorageService {
    */
   async delete(key) {
     if (!this.supabase) {
-      throw new Error('Supabase Storage chưa được cấu hình');
+      throw new Error('Supabase Storage is not configured');
     }
 
     const { error } = await this.supabase.storage.from(this.bucket).remove([key]);
@@ -135,7 +135,7 @@ class StorageService {
         context: 'StorageService',
         data: { key, error: error.message },
       });
-      throw new Error(`Xóa file thất bại: ${error.message}`);
+      throw new Error(`File deletion failed: ${error.message}`);
     }
 
     logger.info('File deleted', {
@@ -143,7 +143,7 @@ class StorageService {
       data: { key },
     });
 
-    return { message: 'File đã được xóa', key };
+    return { message: 'File deleted', key };
   }
 
   /**
@@ -154,7 +154,7 @@ class StorageService {
    */
   async listFiles(folder = '') {
     if (!this.supabase) {
-      throw new Error('Supabase Storage chưa được cấu hình');
+      throw new Error('Supabase Storage is not configured');
     }
 
     const { data, error } = await this.supabase.storage
@@ -162,7 +162,7 @@ class StorageService {
       .list(folder, { limit: 100, sortBy: { column: 'created_at', order: 'desc' } });
 
     if (error) {
-      throw new Error(`Lấy danh sách file thất bại: ${error.message}`);
+      throw new Error(`Failed to list files: ${error.message}`);
     }
 
     return (data || []).map((file) => ({

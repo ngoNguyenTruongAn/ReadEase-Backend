@@ -37,14 +37,14 @@ class EmailService {
    */
   async sendOTP(to, code, type) {
     const subject =
-      type === 'EMAIL_VERIFY' ? 'ReadEase — Xác thực tài khoản' : 'ReadEase — Đặt lại mật khẩu';
+      type === 'EMAIL_VERIFY' ? 'ReadEase — Verify Your Account' : 'ReadEase — Reset Your Password';
 
-    const heading = type === 'EMAIL_VERIFY' ? 'Xác thực tài khoản của bạn' : 'Đặt lại mật khẩu';
+    const heading = type === 'EMAIL_VERIFY' ? 'Verify Your Account' : 'Reset Your Password';
 
     const description =
       type === 'EMAIL_VERIFY'
-        ? 'Cảm ơn bạn đã đăng ký ReadEase! Nhập mã bên dưới để xác thực email.'
-        : 'Bạn đã yêu cầu đặt lại mật khẩu. Nhập mã bên dưới để tiếp tục.';
+        ? 'Thank you for signing up for ReadEase! Enter the code below to verify your email.'
+        : 'You have requested a password reset. Enter the code below to continue.';
 
     const html = `
       <div style="font-family: 'Segoe UI', Arial, sans-serif; max-width: 480px; margin: 0 auto; padding: 32px; background: #f8f9fa; border-radius: 16px;">
@@ -60,7 +60,7 @@ class EmailService {
             </div>
           </div>
           <p style="color: #999; font-size: 12px; text-align: center;">
-            Mã có hiệu lực trong <strong>5 phút</strong>. Không chia sẻ mã này với ai.
+            This code is valid for <strong>5 minutes</strong>. Do not share this code with anyone.
           </p>
         </div>
         <p style="color: #bbb; font-size: 11px; text-align: center; margin-top: 16px;">

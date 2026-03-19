@@ -111,7 +111,7 @@ describe('Auth — RBAC & Guards', () => {
           password: 'password123',
           displayName: 'Test',
         }),
-      ).rejects.toThrow('Email này đã được đăng ký');
+      ).rejects.toThrow('This email is already registered');
     });
 
     it('should default to ROLE_GUARDIAN', async () => {
@@ -169,7 +169,7 @@ describe('Auth — RBAC & Guards', () => {
           email: 'nonexist@test.com',
           password: 'password123',
         }),
-      ).rejects.toThrow('Email hoặc mật khẩu không đúng');
+      ).rejects.toThrow('Invalid email or password');
     });
 
     it('should throw UnauthorizedException for wrong password', async () => {
@@ -188,7 +188,7 @@ describe('Auth — RBAC & Guards', () => {
           email: 'test@test.com',
           password: 'wrongpassword',
         }),
-      ).rejects.toThrow('Email hoặc mật khẩu không đúng');
+      ).rejects.toThrow('Invalid email or password');
     });
 
     it('should reject login if email not verified', async () => {
@@ -204,7 +204,7 @@ describe('Auth — RBAC & Guards', () => {
           email: 'test@test.com',
           password: 'password123',
         }),
-      ).rejects.toThrow('Vui lòng xác thực email');
+      ).rejects.toThrow('Please verify your email');
     });
   });
 
