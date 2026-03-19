@@ -8,8 +8,8 @@ class VerifyEmailDto {
       .pattern(/^\d{6}$/)
       .required()
       .messages({
-        'string.length': 'Mã OTP phải có 6 chữ số',
-        'string.pattern.base': 'Mã OTP phải là 6 chữ số',
+        'string.length': 'OTP code must be 6 digits',
+        'string.pattern.base': 'OTP code must be 6 digits',
       }),
   });
 }

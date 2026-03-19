@@ -33,7 +33,7 @@ class AuthService {
     });
 
     if (existing && existing.email_verified) {
-      throw new ConflictException('Email này đã được đăng ký');
+      throw new ConflictException('This email is already registered');
     }
 
     // If user exists but not verified, delete old and re-register
@@ -46,7 +46,7 @@ class AuthService {
     const user = this.userRepository.create({
       email: dto.email,
       password_hash,
-      display_name: dto.displayName,
+      display_name: dto.display_name || dto.displayName,
       role: 'ROLE_GUARDIAN', // default, will be set after verify
       email_verified: false,
       is_active: false,
@@ -64,7 +64,7 @@ class AuthService {
     });
 
     return {
-      message: 'Đăng ký thành công! Vui lòng kiểm tra email để lấy mã xác thực.',
+      message: 'Registration successful! Please check your email for the verification code.',
       email: user.email,
     };
   }
@@ -79,11 +79,11 @@ class AuthService {
     });
 
     if (!user) {
-      throw new NotFoundException('Không tìm thấy tài khoản với email này');
+      throw new NotFoundException('No account found with this email');
     }
 
     if (user.email_verified) {
-      throw new BadRequestException('Email đã được xác thực trước đó');
+      throw new BadRequestException('Email has already been verified');
     }
 
     // Verify OTP
@@ -103,7 +103,7 @@ class AuthService {
     });
 
     return {
-      message: 'Xác thực email thành công!',
+      message: 'Email verified successfully!',
       ...tokens,
       user: {
         id: user.id,
@@ -123,18 +123,18 @@ class AuthService {
     });
 
     if (!user) {
-      throw new NotFoundException('Không tìm thấy tài khoản với email này');
+      throw new NotFoundException('No account found with this email');
     }
 
     if (user.email_verified) {
-      throw new BadRequestException('Email đã được xác thực');
+      throw new BadRequestException('Email has already been verified');
     }
 
     const code = await this.otpService.createOTP(user.id, 'EMAIL_VERIFY');
     await this.emailService.sendOTP(user.email, code, 'EMAIL_VERIFY');
 
     return {
-      message: 'Đã gửi lại mã OTP. Vui lòng kiểm tra email.',
+      message: 'OTP has been resent. Please check your email.',
     };
   }
 
@@ -148,7 +148,7 @@ class AuthService {
     });
 
     if (!user) {
-      throw new NotFoundException('Không tìm thấy tài khoản');
+      throw new NotFoundException('Account not found');
     }
 
     user.role = dto.role;
@@ -163,7 +163,7 @@ class AuthService {
     });
 
     return {
-      message: `Đã cập nhật vai trò: ${dto.role}`,
+      message: `Role updated: ${dto.role}`,
       ...tokens,
       user: {
         id: user.id,
@@ -183,21 +183,21 @@ class AuthService {
     });
 
     if (!user) {
-      throw new UnauthorizedException('Email hoặc mật khẩu không đúng');
+      throw new UnauthorizedException('Invalid email or password');
     }
 
     if (!user.email_verified) {
-      throw new UnauthorizedException('Vui lòng xác thực email trước khi đăng nhập');
+      throw new UnauthorizedException('Please verify your email before logging in');
     }
 
     if (!user.is_active) {
-      throw new UnauthorizedException('Tài khoản đã bị vô hiệu hóa');
+      throw new UnauthorizedException('Account has been deactivated');
     }
 
     const match = await bcrypt.compare(dto.password, user.password_hash);
 
     if (!match) {
-      throw new UnauthorizedException('Email hoặc mật khẩu không đúng');
+      throw new UnauthorizedException('Invalid email or password');
     }
 
     // Update last_login_at
@@ -228,7 +228,7 @@ class AuthService {
     if (!user) {
       // Don't reveal that email doesn't exist (security)
       return {
-        message: 'Nếu email tồn tại, mã OTP đã được gửi.',
+        message: 'If the email exists, an OTP has been sent.',
       };
     }
 
@@ -241,7 +241,7 @@ class AuthService {
     });
 
     return {
-      message: 'Mã OTP đã được gửi đến email của bạn.',
+      message: 'OTP has been sent to your email.',
     };
   }
 
@@ -255,7 +255,7 @@ class AuthService {
     });
 
     if (!user) {
-      throw new NotFoundException('Không tìm thấy tài khoản với email này');
+      throw new NotFoundException('No account found with this email');
     }
 
     // Verify OTP
@@ -271,7 +271,7 @@ class AuthService {
     });
 
     return {
-      message: 'Đặt lại mật khẩu thành công! Vui lòng đăng nhập.',
+      message: 'Password reset successful! Please log in.',
     };
   }
 
@@ -285,14 +285,14 @@ class AuthService {
     });
 
     if (!user) {
-      throw new NotFoundException('Không tìm thấy tài khoản');
+      throw new NotFoundException('Account not found');
     }
 
     // Verify old password
     const match = await bcrypt.compare(dto.oldPassword, user.password_hash);
 
     if (!match) {
-      throw new BadRequestException('Mật khẩu cũ không đúng');
+      throw new BadRequestException('Old password is incorrect');
     }
 
     // Hash new password
@@ -305,7 +305,7 @@ class AuthService {
     });
 
     return {
-      message: 'Đổi mật khẩu thành công!',
+      message: 'Password changed successfully!',
     };
   }
 

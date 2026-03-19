@@ -76,11 +76,11 @@ class OtpService {
     });
 
     if (!otp) {
-      throw new BadRequestException('Mã OTP không đúng hoặc đã sử dụng');
+      throw new BadRequestException('Invalid or already used OTP code');
     }
 
     if (new Date() > new Date(otp.expires_at)) {
-      throw new BadRequestException('Mã OTP đã hết hạn. Vui lòng gửi lại mã mới.');
+      throw new BadRequestException('OTP code has expired. Please request a new one.');
     }
 
     // Mark as used

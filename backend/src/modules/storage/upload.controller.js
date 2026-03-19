@@ -5,7 +5,7 @@
  *
  * Endpoints:
  *   POST   /api/v1/upload          — Upload file (multipart/form-data)
- *   POST   /api/v1/upload/multiple — Upload nhiều file
+ *   POST   /api/v1/upload/multiple — Upload multiple files
  *   GET    /api/v1/upload/:folder  — List files trong folder
  *   DELETE /api/v1/upload          — Delete file by key
  */
@@ -45,7 +45,7 @@ const multerOptions = {
     } else {
       cb(
         new BadRequestException(
-          `Loại file không hỗ trợ: ${file.mimetype}. Chỉ chấp nhận: ${ALLOWED_TYPES.join(', ')}`,
+          `Unsupported file type: ${file.mimetype}. Allowed: ${ALLOWED_TYPES.join(', ')}`,
         ),
         false,
       );
@@ -70,7 +70,7 @@ class UploadController {
     const file = req.file;
 
     if (!file) {
-      throw new BadRequestException('Vui lòng chọn file để upload');
+      throw new BadRequestException('Please select a file to upload');
     }
 
     const folder = req.body?.folder || 'general';
@@ -102,7 +102,7 @@ class UploadController {
     const files = req.files;
 
     if (!files || files.length === 0) {
-      throw new BadRequestException('Vui lòng chọn ít nhất 1 file');
+      throw new BadRequestException('Please select at least 1 file');
     }
 
     const folder = req.body?.folder || 'general';
@@ -153,7 +153,7 @@ class UploadController {
    */
   async deleteFile(body) {
     if (!body?.key) {
-      throw new BadRequestException('Vui lòng cung cấp key của file cần xóa');
+      throw new BadRequestException('Please provide the file key to delete');
     }
 
     const result = await this.storageService.delete(body.key);
