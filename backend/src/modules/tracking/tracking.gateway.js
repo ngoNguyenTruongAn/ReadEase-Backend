@@ -79,6 +79,21 @@ class TrackingGateway {
           contentId,
         },
       });
+
+      // Tell client to clear previous intervention UI state for new content/session.
+      if (client.readyState === 1) {
+        client.send(
+          JSON.stringify({
+            event: 'intervention:reset',
+            data: {
+              sessionId: client.session_id,
+              contentId,
+              reason: 'NEW_CONTENT',
+              timestamp: Date.now(),
+            },
+          }),
+        );
+      }
     } catch (err) {
       logger.error('session:start failed', {
         context: 'TrackingGateway',
@@ -130,9 +145,10 @@ class TrackingGateway {
    */
   async classifyAndRoute(client, points) {
     const mlResult = await this.mlClient.classify(client.session_id, points);
+    const lastPoint = points.length ? points[points.length - 1] : null;
 
     // Route intervention to client
-    const interventionType = routeIntervention(client, mlResult);
+    const interventionType = routeIntervention(client, mlResult, lastPoint);
 
     // Store cognitive state event in DB for clinician replay
     await this.replayStorage.storeEvents(client.session_id, [
