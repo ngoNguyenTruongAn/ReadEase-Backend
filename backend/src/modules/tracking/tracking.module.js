@@ -3,6 +3,7 @@ const { TypeOrmModule } = require('@nestjs/typeorm');
 const { HttpModule } = require('@nestjs/axios');
 
 const TrackingGateway = require('./tracking.gateway');
+const { TrackingController } = require('./tracking.controller');
 
 const TrajectoryBufferService = require('./services/trajectory-buffer.service');
 const ReplayStorageService = require('./services/replay-storage.service');
@@ -15,6 +16,7 @@ class TrackingModule {}
 
 Module({
   imports: [TypeOrmModule.forFeature([SessionReplayEventEntity]), HttpModule],
+  controllers: [TrackingController],
   providers: [
     TrackingGateway,
     TrajectoryBufferService,
