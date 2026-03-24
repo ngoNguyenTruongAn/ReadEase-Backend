@@ -27,6 +27,7 @@ const { OtpCodeEntity } = require('./modules/auth/entities/otp-code.entity');
 const { AuthModule } = require('./modules/auth/auth.module');
 const { ReadingModule } = require('./modules/reading/reading.module');
 const { StorageModule } = require('./modules/storage/storage.module');
+const { GamificationModule } = require('./modules/gamification/gamification.module');
 
 const entities = [
   UserEntity,
@@ -71,6 +72,7 @@ const metadata = {
     ReadingModule,
     TrackingModule,
     StorageModule,
+    GamificationModule,
     ThrottlerModule.forRoot([
       {
         ttl: 60000,

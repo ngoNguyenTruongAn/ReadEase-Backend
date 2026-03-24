@@ -67,6 +67,8 @@ class ReplayStorageService {
           session_id: sessionId,
           event_type: e.type || 'mouse_move',
           payload: e,
+          cognitive_state: e.state || e.cognitiveState || null,
+          intervention_type: e.interventionType || null,
           timestamp: Number(e.timestamp),
           created_at: new Date(),
         }));

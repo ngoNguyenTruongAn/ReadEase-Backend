@@ -9,13 +9,14 @@ const TrajectoryBufferService = require('./services/trajectory-buffer.service');
 const ReplayStorageService = require('./services/replay-storage.service');
 const SessionService = require('./services/session.service');
 const MlClientService = require('./services/ml-client.service');
+const { GamificationModule } = require('../gamification/gamification.module');
 
 const { SessionReplayEventEntity } = require('./entities/session-replay-event.entity');
 
 class TrackingModule {}
 
 Module({
-  imports: [TypeOrmModule.forFeature([SessionReplayEventEntity]), HttpModule],
+  imports: [TypeOrmModule.forFeature([SessionReplayEventEntity]), HttpModule, GamificationModule],
   controllers: [TrackingController],
   providers: [
     TrackingGateway,
