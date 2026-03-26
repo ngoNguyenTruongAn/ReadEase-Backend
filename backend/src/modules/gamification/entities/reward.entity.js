@@ -29,6 +29,14 @@ const RewardEntity = new EntitySchema({
       type: 'boolean',
       default: true,
     },
+    version: {
+      type: 'int',
+      default: 0,
+    },
+    stock: {
+      type: 'int',
+      nullable: true,
+    },
     created_at: {
       type: 'timestamptz',
       createDate: true,

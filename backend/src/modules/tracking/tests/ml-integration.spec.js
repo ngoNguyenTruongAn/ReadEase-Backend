@@ -105,15 +105,19 @@ describe('Intervention Router', () => {
   });
 
   it('REGRESSION → sends adaptation:trigger + tooltip:show', () => {
-    const result = routeIntervention(mockClient, {
-      state: 'REGRESSION',
-      confidence: 0.92,
-      session_id: 'sess-1',
-    }, {
-      x: 120,
-      y: 42,
-      word_index: 7,
-    });
+    const result = routeIntervention(
+      mockClient,
+      {
+        state: 'REGRESSION',
+        confidence: 0.92,
+        session_id: 'sess-1',
+      },
+      {
+        x: 120,
+        y: 42,
+        word_index: 7,
+      },
+    );
 
     expect(result).toBe('DUAL');
     expect(mockClient.send).toHaveBeenCalledTimes(2);

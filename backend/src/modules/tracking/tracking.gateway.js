@@ -17,6 +17,7 @@ const SessionService = require('./services/session.service');
 const ReplayStorageService = require('./services/replay-storage.service');
 const MlClientService = require('./services/ml-client.service');
 const { routeIntervention } = require('./utils/intervention-router');
+const { TokenService } = require('../gamification/gamification.service');
 
 class TrackingGateway {
   constructor(
@@ -25,12 +26,14 @@ class TrackingGateway {
     replayStorageService,
     mlClientService,
     dataSource,
+    tokenService,
   ) {
     this.trajectoryBuffer = trajectoryBufferService;
     this.sessionService = sessionService;
     this.replayStorage = replayStorageService;
     this.mlClient = mlClientService;
     this.dataSource = dataSource;
+    this.tokenService = tokenService;
   }
 
   handleConnection(client, request) {
@@ -186,7 +189,17 @@ class TrackingGateway {
 
       await this.trajectoryBuffer.flushSession(client.session_id);
 
-      await this.sessionService.endSession(client.session_id);
+      const summary = await this.sessionService.endSession(client.session_id);
+      await this.tokenService.earnFromSession(client.user_id, client.session_id);
+
+      logger.info('Session completed with effort scoring', {
+        context: 'TrackingGateway',
+        data: {
+          sessionId: client.session_id,
+          userId: client.user_id,
+          effortScore: summary?.effort_score ?? 0,
+        },
+      });
     } catch (err) {
       logger.error('session end failed', {
         context: 'TrackingGateway',
@@ -349,6 +362,7 @@ Inject(SessionService)(TrackingGateway, undefined, 1);
 Inject(ReplayStorageService)(TrackingGateway, undefined, 2);
 Inject(MlClientService)(TrackingGateway, undefined, 3);
 Inject(DataSource)(TrackingGateway, undefined, 4);
+Inject(TokenService)(TrackingGateway, undefined, 5);
 
 Reflect.decorate([WebSocketGateway({ path: '/tracking', cors: true })], TrackingGateway);
 
