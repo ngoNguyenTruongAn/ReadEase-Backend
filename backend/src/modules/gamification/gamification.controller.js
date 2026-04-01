@@ -46,7 +46,7 @@ class GamificationController {
     this.assertChildAccess(childId, req.user);
 
     const result = await this.tokenService.getBalance(childId);
-    return { success: true, data: result };
+    return result;
   }
 
   async getHistory(childId, query, req) {
@@ -59,12 +59,12 @@ class GamificationController {
     }
 
     const result = await this.tokenService.getHistory(childId, value.limit, value.offset);
-    return { success: true, data: result.data, meta: result.meta };
+    return result;
   }
 
   async getRewards() {
     const rewards = await this.tokenService.listActiveRewards();
-    return { success: true, data: rewards };
+    return rewards;
   }
 
   async redeemReward(rewardId, body, req) {
@@ -83,7 +83,7 @@ class GamificationController {
       rewardId,
       value.expectedVersion,
     );
-    return { success: true, data: result };
+    return result;
   }
 }
 

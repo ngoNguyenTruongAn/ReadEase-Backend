@@ -40,8 +40,8 @@ describe('GamificationController', () => {
       user: { sub: '11111111-1111-4111-8111-111111111111', role: 'ROLE_CHILD' },
     });
 
-    expect(result.success).toBe(true);
-    expect(result.data.balance).toBe(200);
+    expect(result.balance).toBe(200);
+    expect(result.childId).toBe('11111111-1111-4111-8111-111111111111');
   });
 
   it('should block child from viewing another child balance', async () => {
