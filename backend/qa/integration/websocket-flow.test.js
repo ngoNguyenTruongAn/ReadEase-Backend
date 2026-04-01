@@ -16,15 +16,16 @@ const SESSION_ID = randomUUID();
 const USER_ID = randomUUID();
 const CONTENT_ID = randomUUID();
 
-const WS_URL = process.env.WS_URL || "ws://localhost:3000";
+const WS_URL = process.env.WS_URL || "ws://localhost:3000/tracking";
+
 const JWT_SECRET = process.env.JWT_SECRET || "test-secret";
 
 const token = jwt.sign(
-{
-  user_id: USER_ID,
-  session_id: SESSION_ID
-},
-process.env.JWT_SECRET
+  {
+    user_id: USER_ID,
+    session_id: SESSION_ID
+  },
+  process.env.JWT_SECRET
 );
 
 const pg = new Client({
@@ -132,7 +133,7 @@ async function run() {
     log("Creating test user...");
 
     await pg.query(
-  `
+      `
   INSERT INTO users (
     id,
     email,
@@ -143,13 +144,13 @@ async function run() {
   )
   VALUES ($1,$2,$3,$4,NOW(),NOW())
   `,
-  [
-    USER_ID,
-    "integration@test.com",
-    "hash",
-    "ROLE_GUARDIAN"
-  ]
-);
+      [
+        USER_ID,
+        "integration@test.com",
+        "hash",
+        "ROLE_GUARDIAN"
+      ]
+    );
 
     log("Creating test content...");
 
@@ -166,9 +167,9 @@ async function run() {
       `,
       [
         CONTENT_ID,
-  "Integration Test Story",
-  "This is a test content.",
-  5
+        "Integration Test Story",
+        "This is a test content.",
+        5
       ]
     );
 
