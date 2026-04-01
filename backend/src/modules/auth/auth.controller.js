@@ -27,6 +27,7 @@ const {
 } = require('@nestjs/common');
 const { AuthService } = require('./auth.service');
 const { JwtAuthGuard } = require('./guards/jwt-auth.guard');
+const { RefreshAuthGuard } = require('./guards/refresh-auth.guard');
 const { RolesGuard } = require('./guards/roles.guard');
 const { Roles } = require('./decorators/roles.decorator');
 
@@ -182,7 +183,7 @@ Body()(AuthController.prototype, 'login', 0);
 // ── POST /auth/refresh (Protected: JwtAuthGuard) → 200 OK ──
 const refreshDescriptor = Object.getOwnPropertyDescriptor(AuthController.prototype, 'refresh');
 Reflect.decorate(
-  [Post('refresh'), HttpCode(200), UseGuards(JwtAuthGuard)],
+  [Post('refresh'), HttpCode(200), UseGuards(RefreshAuthGuard)],
   AuthController.prototype,
   'refresh',
   refreshDescriptor,
