@@ -12,6 +12,7 @@ const {
 
 const { AnalyticsService } = require('./analytics.service');
 const HeatmapQueryDto = require('./dto/heatmap-query.dto');
+const TrendsQueryDto = require('./dto/trends-query.dto');
 
 const { JwtAuthGuard } = require('../auth/guards/jwt-auth.guard');
 const { RolesGuard } = require('../auth/guards/roles.guard');
@@ -37,11 +38,26 @@ class AnalyticsController {
 
     return this.analyticsService.getHeatmap(childId, value.sessionId);
   }
+
+  async getTrends(childId, query) {
+    const { error: paramError } = TrendsQueryDto.paramsSchema.validate({ childId });
+    if (paramError) {
+      throw new BadRequestException(paramError.details[0].message);
+    }
+
+    const { error: queryError, value } = TrendsQueryDto.querySchema.validate(query);
+    if (queryError) {
+      throw new BadRequestException(queryError.details[0].message);
+    }
+
+    return this.analyticsService.getTrends(childId, value.days);
+  }
 }
 
 Controller('api/v1/analytics')(AnalyticsController);
 Inject(AnalyticsService)(AnalyticsController, undefined, 0);
 
+// ── getHeatmap: GET /api/v1/analytics/:childId/heatmap ──
 const getHeatmapDescriptor = Object.getOwnPropertyDescriptor(
   AnalyticsController.prototype,
   'getHeatmap',
@@ -56,5 +72,21 @@ Reflect.decorate(
 
 Param('childId')(AnalyticsController.prototype, 'getHeatmap', 0);
 Query()(AnalyticsController.prototype, 'getHeatmap', 1);
+
+// ── getTrends: GET /api/v1/analytics/:childId/trends ──
+const getTrendsDescriptor = Object.getOwnPropertyDescriptor(
+  AnalyticsController.prototype,
+  'getTrends',
+);
+
+Reflect.decorate(
+  [Get(':childId/trends'), UseGuards(JwtAuthGuard, RolesGuard), Roles('ROLE_CLINICIAN')],
+  AnalyticsController.prototype,
+  'getTrends',
+  getTrendsDescriptor,
+);
+
+Param('childId')(AnalyticsController.prototype, 'getTrends', 0);
+Query()(AnalyticsController.prototype, 'getTrends', 1);
 
 module.exports = { AnalyticsController };
