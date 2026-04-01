@@ -105,13 +105,21 @@ describe('Intervention Router', () => {
   });
 
   it('REGRESSION → sends adaptation:trigger + tooltip:show', () => {
-    const result = routeIntervention(mockClient, {
-      state: 'REGRESSION',
-      confidence: 0.92,
-      session_id: 'sess-1',
-    });
+    const result = routeIntervention(
+      mockClient,
+      {
+        state: 'REGRESSION',
+        confidence: 0.92,
+        session_id: 'sess-1',
+      },
+      {
+        x: 120,
+        y: 42,
+        word_index: 7,
+      },
+    );
 
-    expect(result).toBe('SEMANTIC');
+    expect(result).toBe('DUAL');
     expect(mockClient.send).toHaveBeenCalledTimes(2);
 
     const events = sentMessages.map((m) => m.event);
@@ -119,9 +127,18 @@ describe('Intervention Router', () => {
     expect(events).toContain('tooltip:show');
 
     const trigger = sentMessages.find((m) => m.event === 'adaptation:trigger');
-    expect(trigger.data.type).toBe('SEMANTIC');
+    expect(trigger.data.type).toBe('VISUAL');
+    expect(trigger.data.mode).toBe('DUAL_INTERVENTION');
     expect(trigger.data.state).toBe('REGRESSION');
     expect(trigger.data.confidence).toBe(0.92);
+    expect(trigger.data.params.transition.durationMs).toBe(200);
+    expect(trigger.data.params.transition.easing).toBe('ease-in-out');
+
+    const tooltip = sentMessages.find((m) => m.event === 'tooltip:show');
+    expect(tooltip.data.type).toBe('SEMANTIC');
+    expect(tooltip.data.wordIndex).toBe(7);
+    expect(tooltip.data.cursorX).toBe(120);
+    expect(tooltip.data.cursorY).toBe(42);
   });
 
   it('DISTRACTION → sends adaptation:trigger (VISUAL only)', () => {
@@ -137,7 +154,10 @@ describe('Intervention Router', () => {
     const trigger = sentMessages[0];
     expect(trigger.event).toBe('adaptation:trigger');
     expect(trigger.data.type).toBe('VISUAL');
+    expect(trigger.data.mode).toBe('VISUAL_ONLY');
     expect(trigger.data.state).toBe('DISTRACTION');
+    expect(trigger.data.params.transition.durationMs).toBe(200);
+    expect(trigger.data.params.transition.easing).toBe('ease-in-out');
   });
 
   it('FLUENT → no event sent', () => {
