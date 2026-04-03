@@ -295,6 +295,10 @@ class AuthService {
       throw new BadRequestException('Old password is incorrect');
     }
 
+    if (dto.oldPassword === dto.newPassword) {
+      throw new BadRequestException('New password must be different from old password');
+    }
+
     // Hash new password
     user.password_hash = await bcrypt.hash(dto.newPassword, 12);
     await this.userRepository.save(user);
