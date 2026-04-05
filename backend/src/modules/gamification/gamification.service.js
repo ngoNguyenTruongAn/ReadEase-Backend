@@ -5,6 +5,7 @@ const {
   NotFoundException,
 } = require('@nestjs/common');
 const { InjectDataSource } = require('@nestjs/typeorm');
+const { logger } = require('../../common/logger/winston.config');
 
 class TokenService {
   constructor(dataSource) {
@@ -164,6 +165,11 @@ class TokenService {
       }
 
       await queryRunner.commitTransaction();
+
+      logger.info('Tokens earned from session', {
+        context: 'TokenService',
+        data: { childId, sessionId, effortScore, baseTokens, bonusTokens, streakCount },
+      });
 
       return {
         childId,
@@ -346,6 +352,17 @@ class TokenService {
       );
 
       await queryRunner.commitTransaction();
+
+      logger.info('Reward redeemed', {
+        context: 'TokenService',
+        data: {
+          childId,
+          rewardId: reward.id,
+          rewardName: reward.name,
+          cost: rewardCost,
+          balanceAfter: currentBalance - rewardCost,
+        },
+      });
 
       return {
         redemption: redemptionRows[0],

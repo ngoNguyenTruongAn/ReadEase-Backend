@@ -27,11 +27,11 @@ class GamificationController {
     this.tokenService = tokenService;
   }
 
-  validateChildId(childId) {
+  validateUuid(value, fieldName = 'id') {
     const isUuid =
-      /^[0-9a-f]{8}-[0-9a-f]{4}-[1-8][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i.test(childId);
+      /^[0-9a-f]{8}-[0-9a-f]{4}-[1-8][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i.test(value);
     if (!isUuid) {
-      throw new BadRequestException('childId must be a valid UUID');
+      throw new BadRequestException(`${fieldName} must be a valid UUID`);
     }
   }
 
@@ -42,7 +42,7 @@ class GamificationController {
   }
 
   async getBalance(childId, req) {
-    this.validateChildId(childId);
+    this.validateUuid(childId, 'childId');
     this.assertChildAccess(childId, req.user);
 
     const result = await this.tokenService.getBalance(childId);
@@ -50,7 +50,7 @@ class GamificationController {
   }
 
   async getHistory(childId, query, req) {
-    this.validateChildId(childId);
+    this.validateUuid(childId, 'childId');
     this.assertChildAccess(childId, req.user);
 
     const { error, value } = HistoryQueryDto.schema.validate(query);
@@ -73,10 +73,10 @@ class GamificationController {
       throw new BadRequestException(error.details[0].message);
     }
 
-    this.validateChildId(value.childId);
+    this.validateUuid(value.childId, 'childId');
     this.assertChildAccess(value.childId, req.user);
 
-    this.validateChildId(rewardId);
+    this.validateUuid(rewardId, 'rewardId');
 
     const result = await this.tokenService.redeemReward(
       value.childId,
