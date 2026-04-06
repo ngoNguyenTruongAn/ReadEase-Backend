@@ -1,9 +1,131 @@
 const { Injectable, Inject, NotFoundException } = require('@nestjs/common');
 const { ContentRepository } = require('./content.repository');
 
+const VI_COMPOUND_BIGRAMS = new Set([
+  'sinh viên',
+  'học sinh',
+  'giáo viên',
+  'công nghệ',
+  'đại học',
+  'tiểu học',
+  'trung học',
+  'con chó',
+  'con mèo',
+  'con cá',
+  'con chim',
+  'bầu trời',
+  'mặt trời',
+  'mặt trăng',
+  'thành phố',
+  'đất nước',
+  'gia đình',
+]);
+
+const VI_COMPOUND_TRIGRAMS = new Set([]);
+
+const VI_CLASSIFIER_WORDS = new Set([
+  'con',
+  'cái',
+  'chiếc',
+  'cây',
+  'quyển',
+  'cuốn',
+  'tờ',
+  'bức',
+  'viên',
+  'miếng',
+  'hòn',
+  'bộ',
+  'đôi',
+]);
+
 class ContentService {
   constructor(contentRepository) {
     this.contentRepository = contentRepository;
+  }
+
+  normalizeTokenForMatch(token) {
+    return String(token || '')
+      .toLowerCase()
+      .replace(/^[^\p{L}\p{N}]+|[^\p{L}\p{N}]+$/gu, '')
+      .trim();
+  }
+
+  isWordLike(token) {
+    return /[\p{L}\p{N}]/u.test(this.normalizeTokenForMatch(token));
+  }
+
+  isInlineWhitespace(token) {
+    return /^[ \t]+$/.test(String(token || ''));
+  }
+
+  preprocessBodyForStorage(body) {
+    const normalizedBody = String(body || '')
+      .replace(/\r\n?/g, '\n')
+      .replace(/[ \t]+/g, ' ')
+      .replace(/\n{3,}/g, '\n\n')
+      .trim();
+
+    if (!normalizedBody) {
+      return '';
+    }
+
+    const tokens = normalizedBody.split(/(\s+)/);
+    const mergedTokens = [];
+
+    let index = 0;
+    while (index < tokens.length) {
+      const token1 = tokens[index] || '';
+
+      if (!token1) {
+        index += 1;
+        continue;
+      }
+
+      if (/^\s+$/.test(token1)) {
+        mergedTokens.push(token1);
+        index += 1;
+        continue;
+      }
+
+      const whitespace1 = tokens[index + 1] || '';
+      const token2 = tokens[index + 2] || '';
+      const whitespace2 = tokens[index + 3] || '';
+      const token3 = tokens[index + 4] || '';
+
+      const word1 = this.normalizeTokenForMatch(token1);
+      const word2 = this.normalizeTokenForMatch(token2);
+      const word3 = this.normalizeTokenForMatch(token3);
+
+      const canCheckPair = word1 && word2 && this.isInlineWhitespace(whitespace1);
+      const canCheckTriplet = canCheckPair && word3 && this.isInlineWhitespace(whitespace2);
+
+      const isKnownTrigram =
+        canCheckTriplet && VI_COMPOUND_TRIGRAMS.has(`${word1} ${word2} ${word3}`);
+      const isKnownBigram = canCheckPair && VI_COMPOUND_BIGRAMS.has(`${word1} ${word2}`);
+      const isClassifierPhrase =
+        canCheckPair &&
+        VI_CLASSIFIER_WORDS.has(word1) &&
+        this.isWordLike(token2) &&
+        !/[.!?;:]/.test(token2);
+
+      if (isKnownTrigram) {
+        mergedTokens.push(`${token1}_${token2}_${token3}`);
+        index += 5;
+        continue;
+      }
+
+      if (isKnownBigram || isClassifierPhrase) {
+        mergedTokens.push(`${token1}_${token2}`);
+        index += 3;
+        continue;
+      }
+
+      mergedTokens.push(token1);
+      index += 1;
+    }
+
+    return mergedTokens.join('').replace(/ +\n/g, '\n').replace(/\n +/g, '\n').trim();
   }
 
   calculateWordCount(body) {
@@ -64,13 +186,25 @@ class ContentService {
     };
   }
 
+  async getContentById(id) {
+    const content = await this.contentRepository.findById(id);
+
+    if (!content) {
+      throw new NotFoundException('Content not found');
+    }
+
+    return this.serializeContent(content);
+  }
+
   async createContent(dto, user) {
+    const normalizedBody = this.preprocessBodyForStorage(dto.body);
+
     const created = await this.contentRepository.createContent({
       title: dto.title,
-      body: dto.body,
+      body: normalizedBody,
       difficulty: dto.difficulty,
       age_group: dto.age_group,
-      word_count: this.calculateWordCount(dto.body),
+      word_count: this.calculateWordCount(normalizedBody),
       cover_image_url: dto.cover_image_url || null,
       created_by: user.sub,
     });
@@ -88,7 +222,8 @@ class ContentService {
     const updatePayload = { ...dto };
 
     if (Object.prototype.hasOwnProperty.call(dto, 'body')) {
-      updatePayload.word_count = this.calculateWordCount(dto.body);
+      updatePayload.body = this.preprocessBodyForStorage(dto.body);
+      updatePayload.word_count = this.calculateWordCount(updatePayload.body);
     }
 
     const updated = await this.contentRepository.updateContent(id, updatePayload);
