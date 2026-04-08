@@ -114,7 +114,7 @@ describe('Auth — RBAC & Guards', () => {
       ).rejects.toThrow('This email is already registered');
     });
 
-    it('should default to ROLE_GUARDIAN', async () => {
+    it('should default role to null', async () => {
       mockRepo.findOne.mockResolvedValue(null);
       jest.spyOn(bcrypt, 'hash').mockResolvedValue('hashed-pw');
       mockRepo.create.mockImplementation((data) => ({
@@ -130,9 +130,7 @@ describe('Auth — RBAC & Guards', () => {
         displayName: 'Guardian User',
       });
 
-      expect(mockRepo.create).toHaveBeenCalledWith(
-        expect.objectContaining({ role: 'ROLE_GUARDIAN' }),
-      );
+      expect(mockRepo.create).toHaveBeenCalledWith(expect.objectContaining({ role: null }));
     });
   });
 

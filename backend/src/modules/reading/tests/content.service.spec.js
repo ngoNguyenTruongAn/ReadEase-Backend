@@ -145,7 +145,9 @@ describe('ContentService', () => {
       title: 'Old title',
       body: 'Old body text that is long enough for the minimum validation constraint.',
     });
-    segmentationAdapter.segment.mockResolvedValue('con_mèo chạy nhanh qua sân nhà trong chiều mưa nhẹ.');
+    segmentationAdapter.segment.mockResolvedValue(
+      'con_mèo chạy nhanh qua sân nhà trong chiều mưa nhẹ.',
+    );
     repository.updateContent.mockResolvedValue({
       id: 'content-2',
       title: 'New title',
