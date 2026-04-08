@@ -12,7 +12,6 @@ const { EmailService } = require('./services/email.service');
 describe('AuthService', () => {
   let service;
   let repo;
-  let jwtService;
   let otpService;
   let emailService;
 
@@ -62,7 +61,6 @@ describe('AuthService', () => {
 
     service = module.get(AuthService);
     repo = module.get(getRepositoryToken(UserEntity));
-    jwtService = module.get(JwtService);
     otpService = module.get(OtpService);
     emailService = module.get(EmailService);
   });

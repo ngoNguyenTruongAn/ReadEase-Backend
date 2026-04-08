@@ -16,6 +16,10 @@ const ReadingContentEntity = new EntitySchema({
     body: {
       type: 'text',
     },
+    body_segmented: {
+      type: 'text',
+      nullable: true,
+    },
     difficulty: {
       type: 'varchar',
       length: 20,

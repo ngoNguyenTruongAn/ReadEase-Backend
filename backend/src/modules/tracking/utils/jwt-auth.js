@@ -16,7 +16,7 @@ function verifyWebSocketJWT(token) {
       user_id: decoded.user_id,
       session_id: decoded.session_id,
     };
-  } catch (err) {
+  } catch {
     throw new Error('JWT validation failed');
   }
 }
