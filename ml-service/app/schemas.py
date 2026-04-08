@@ -87,3 +87,15 @@ class CalibrateResponse(BaseModel):
     """Response body for POST /calibrate."""
     child_id: str
     baseline: BaselineResult
+
+
+# ── Segment ────────────────────────────────────────────────
+
+class SegmentRequest(BaseModel):
+    """Request body for POST /segment."""
+    text: str = Field(..., description="Vietnamese text to segment")
+
+
+class SegmentResponse(BaseModel):
+    """Response body for POST /segment."""
+    segmented: str = Field(..., description="Segmented text with underscore-joined compounds")

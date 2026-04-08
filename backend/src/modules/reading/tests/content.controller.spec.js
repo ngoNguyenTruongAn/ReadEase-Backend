@@ -72,7 +72,8 @@ describe('ContentController', () => {
     service.getContentById.mockResolvedValue({
       id: 'content-9',
       title: 'Story detail',
-      body: 'con_bò ăn cỏ',
+      body: 'con bò ăn cỏ',
+      body_segmented: 'con_bò ăn cỏ',
       difficulty: 'EASY',
       age_group: '5-7',
       word_count: 3,
@@ -81,7 +82,8 @@ describe('ContentController', () => {
     const result = await controller.getContentById('content-9');
 
     expect(service.getContentById).toHaveBeenCalledWith('content-9');
-    expect(result.body).toBe('con_bò ăn cỏ');
+    expect(result.body).toBe('con bò ăn cỏ');
+    expect(result.body_segmented).toBe('con_bò ăn cỏ');
   });
 
   it('PUT /content/:id should update content', async () => {

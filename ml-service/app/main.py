@@ -20,6 +20,8 @@ from .schemas import (
     CalibrateRequest,
     CalibrateResponse,
     BaselineResult,
+    SegmentRequest,
+    SegmentResponse,
 )
 from .classifier import load_model, is_model_loaded, predict
 from .calibration import compute_baseline
@@ -30,6 +32,55 @@ logging.basicConfig(
     format="%(asctime)s %(levelname)s [%(name)s] %(message)s",
 )
 logger = logging.getLogger("ml-engine")
+
+# ── Vietnamese tokenizer (lazy load) ──────────────────────
+_tokenizer_available = False
+try:
+    from underthesea import word_tokenize as vi_word_tokenize
+    _tokenizer_available = True
+    logger.info("✓ underthesea loaded for Vietnamese word segmentation")
+except ImportError:
+    logger.warning("⚠ underthesea not installed — /segment will use fallback splitting")
+
+
+def segment_text(text: str) -> str:
+    """
+    Segment Vietnamese text into compound-word tokens joined by underscores.
+
+    Uses underthesea if available, otherwise falls back to whitespace splitting.
+    Processes line-by-line to preserve paragraph structure.
+    """
+    import re
+
+    if not text or not text.strip():
+        return ""
+
+    # Normalize whitespace
+    normalized = text.replace("\r\n", "\n").replace("\r", "\n")
+    normalized = re.sub(r"[ \t]+", " ", normalized)
+    normalized = re.sub(r"\n{3,}", "\n\n", normalized)
+    normalized = normalized.strip()
+
+    if not normalized:
+        return ""
+
+    if not _tokenizer_available:
+        return normalized
+
+    lines = normalized.split("\n")
+    result_lines = []
+
+    for line in lines:
+        stripped = line.strip()
+        if not stripped:
+            result_lines.append("")
+            continue
+
+        tokens = vi_word_tokenize(stripped)
+        segmented_tokens = [t.replace(" ", "_") for t in tokens]
+        result_lines.append(" ".join(segmented_tokens))
+
+    return "\n".join(result_lines)
 
 
 # ── Lifespan: load model on startup ───────────────────────
@@ -72,6 +123,7 @@ def health():
         "status": "ok",
         "service": "ReadEase ML Engine",
         "model_loaded": is_model_loaded(),
+        "tokenizer_available": _tokenizer_available,
         "version": "1.0.0",
     }
 
@@ -128,3 +180,21 @@ def calibrate(request: CalibrateRequest):
         child_id=request.child_id,
         baseline=BaselineResult(**baseline),
     )
+
+
+# ── POST /segment — Vietnamese Word Segmentation ─────────
+@app.post("/segment", response_model=SegmentResponse)
+def segment(request: SegmentRequest):
+    """
+    Segment Vietnamese text using underthesea word_tokenize.
+
+    Compound words are joined with underscores for lightweight
+    frontend splitting (Hybrid architecture).
+
+    Example:
+      Input:  "con bò ăn cỏ"
+      Output: "con_bò ăn cỏ"
+    """
+    segmented = segment_text(request.text)
+
+    return SegmentResponse(segmented=segmented)
