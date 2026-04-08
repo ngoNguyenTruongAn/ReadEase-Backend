@@ -15,6 +15,7 @@ describe('ContentController', () => {
   beforeEach(() => {
     service = {
       getContent: jest.fn(),
+      getContentById: jest.fn(),
       createContent: jest.fn(),
       updateContent: jest.fn(),
       deleteContent: jest.fn(),
@@ -65,6 +66,22 @@ describe('ContentController', () => {
       req.user,
     );
     expect(result.id).toBe('content-1');
+  });
+
+  it('GET /content/:id should return full content detail', async () => {
+    service.getContentById.mockResolvedValue({
+      id: 'content-9',
+      title: 'Story detail',
+      body: 'con_bò ăn cỏ',
+      difficulty: 'EASY',
+      age_group: '5-7',
+      word_count: 3,
+    });
+
+    const result = await controller.getContentById('content-9');
+
+    expect(service.getContentById).toHaveBeenCalledWith('content-9');
+    expect(result.body).toBe('con_bò ăn cỏ');
   });
 
   it('PUT /content/:id should update content', async () => {

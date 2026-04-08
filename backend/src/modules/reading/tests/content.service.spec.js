@@ -26,10 +26,10 @@ describe('ContentService', () => {
     repository.createContent.mockResolvedValue({
       id: 'content-1',
       title: 'Sample',
-      body: 'This is a long enough passage body with many words for testing purposes only.',
+      body: 'Con_bò đang gặm cỏ xanh ngoài đồng vào buổi sáng sớm.',
       difficulty: 'EASY',
       age_group: '5-7',
-      word_count: 14,
+      word_count: 11,
       created_by: 'clinician-1',
       deleted_at: null,
       created_at: new Date('2026-03-15T00:00:00.000Z'),
@@ -38,7 +38,7 @@ describe('ContentService', () => {
     const result = await service.createContent(
       {
         title: 'Sample',
-        body: 'This is a long enough passage body with many words for testing purposes only.',
+        body: 'Con bò đang gặm cỏ xanh ngoài đồng vào buổi sáng sớm.',
         difficulty: 'EASY',
         age_group: '5-7',
       },
@@ -47,13 +47,73 @@ describe('ContentService', () => {
 
     expect(repository.createContent).toHaveBeenCalledWith(
       expect.objectContaining({
+        body: 'Con_bò đang gặm cỏ xanh ngoài đồng vào buổi sáng sớm.',
         created_by: 'clinician-1',
-        word_count: 14,
+        word_count: 11,
       }),
     );
     expect(result).not.toHaveProperty('created_by');
     expect(result).not.toHaveProperty('deleted_at');
-    expect(result.word_count).toBe(14);
+    expect(result.word_count).toBe(11);
+  });
+
+  it('should preprocess exact hybrid example before saving', async () => {
+    repository.createContent.mockResolvedValue({
+      id: 'content-hybrid-1',
+      title: 'Hybrid',
+      body: 'con_bò ăn cỏ',
+      difficulty: 'EASY',
+      age_group: '5-7',
+      word_count: 3,
+      created_at: new Date('2026-03-15T00:00:00.000Z'),
+    });
+
+    const result = await service.createContent(
+      {
+        title: 'Hybrid',
+        body: 'con bò ăn cỏ',
+        difficulty: 'EASY',
+        age_group: '5-7',
+      },
+      { sub: 'clinician-1' },
+    );
+
+    expect(repository.createContent).toHaveBeenCalledWith(
+      expect.objectContaining({
+        body: 'con_bò ăn cỏ',
+        word_count: 3,
+      }),
+    );
+    expect(result.body).toBe('con_bò ăn cỏ');
+  });
+
+  it('should normalize spacing and preserve compact string payload', async () => {
+    repository.createContent.mockResolvedValue({
+      id: 'content-hybrid-2',
+      title: 'Hybrid spacing',
+      body: 'con_bò ăn cỏ\n\ncon_chim bay',
+      difficulty: 'EASY',
+      age_group: '5-7',
+      word_count: 5,
+      created_at: new Date('2026-03-15T00:00:00.000Z'),
+    });
+
+    await service.createContent(
+      {
+        title: 'Hybrid spacing',
+        body: '  con   bò   ăn   cỏ\n\n\ncon  chim bay  ',
+        difficulty: 'EASY',
+        age_group: '5-7',
+      },
+      { sub: 'clinician-1' },
+    );
+
+    expect(repository.createContent).toHaveBeenCalledWith(
+      expect.objectContaining({
+        body: 'con_bò ăn cỏ\n\ncon_chim bay',
+        word_count: 5,
+      }),
+    );
   });
 
   it('should update content and recalculate word_count when body changes', async () => {
@@ -65,16 +125,16 @@ describe('ContentService', () => {
     repository.updateContent.mockResolvedValue({
       id: 'content-2',
       title: 'New title',
-      body: 'Updated body text now has a different amount of words to count correctly.',
+      body: 'con_mèo chạy nhanh qua sân nhà trong chiều mưa nhẹ.',
       difficulty: 'MEDIUM',
       age_group: '8-10',
-      word_count: 13,
+      word_count: 10,
       created_at: new Date('2026-03-15T00:00:00.000Z'),
     });
 
     const result = await service.updateContent('content-2', {
       title: 'New title',
-      body: 'Updated body text now has a different amount of words to count correctly.',
+      body: 'con mèo chạy nhanh qua sân nhà trong chiều mưa nhẹ.',
       difficulty: 'MEDIUM',
       age_group: '8-10',
     });
@@ -82,10 +142,34 @@ describe('ContentService', () => {
     expect(repository.updateContent).toHaveBeenCalledWith(
       'content-2',
       expect.objectContaining({
-        word_count: 13,
+        body: 'con_mèo chạy nhanh qua sân nhà trong chiều mưa nhẹ.',
+        word_count: 10,
       }),
     );
-    expect(result.word_count).toBe(13);
+    expect(result.word_count).toBe(10);
+  });
+
+  it('should get content detail by id', async () => {
+    repository.findById.mockResolvedValue({
+      id: 'content-42',
+      title: 'Chi tiet',
+      body: 'con_bò ăn cỏ',
+      difficulty: 'EASY',
+      age_group: '5-7',
+      word_count: 3,
+      cover_image_url: null,
+      created_at: new Date('2026-03-15T00:00:00.000Z'),
+    });
+
+    const result = await service.getContentById('content-42');
+
+    expect(repository.findById).toHaveBeenCalledWith('content-42');
+    expect(result).toEqual(
+      expect.objectContaining({
+        id: 'content-42',
+        body: 'con_bò ăn cỏ',
+      }),
+    );
   });
 
   it('should return paginated content data with metadata', async () => {
@@ -136,6 +220,7 @@ describe('ContentService', () => {
     });
     expect(result.data[0]).not.toHaveProperty('created_by');
     expect(result.data[0]).not.toHaveProperty('deleted_at');
+    expect(result.data[0]).not.toHaveProperty('body');
   });
 
   it('should soft delete content', async () => {
@@ -153,5 +238,11 @@ describe('ContentService', () => {
     await expect(service.updateContent('missing-id', { title: 'New title' })).rejects.toThrow(
       NotFoundException,
     );
+  });
+
+  it('should throw NotFoundException when content detail is missing', async () => {
+    repository.findById.mockResolvedValue(null);
+
+    await expect(service.getContentById('missing-id')).rejects.toThrow(NotFoundException);
   });
 });

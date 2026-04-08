@@ -1,0 +1,288 @@
+openapi: 3.0.3
+info:
+  title: ReadEase Guardian Data API
+  version: 2.0.0
+  description: COPPA guardian endpoints for one-click child data export and permanent erasure.
+servers:
+  - url: http://localhost:3000/api/v1
+    description: Local development
+
+tags:
+  - name: Guardian
+    description: Guardian child-data privacy operations
+
+paths:
+  /guardian/{childId}/export:
+    post:
+      tags: [Guardian]
+      summary: Export all child data as JSON dump
+      operationId: exportChildData
+      security:
+        - bearerAuth: []
+      parameters:
+        - $ref: '#/components/parameters/ChildIdPath'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/GuardianConfirmationRequest'
+            example:
+              confirmationToken: CONFIRM_EXPORT_CHILD_DATA
+      responses:
+        '200':
+          description: Child data exported successfully
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ExportSuccessResponse'
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+        '429':
+          $ref: '#/components/responses/TooManyRequests'
+
+  /guardian/{childId}/erase:
+    delete:
+      tags: [Guardian]
+      summary: Permanently erase all child data in cascade-safe order
+      operationId: eraseChildData
+      security:
+        - bearerAuth: []
+      parameters:
+        - $ref: '#/components/parameters/ChildIdPath'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/GuardianConfirmationRequest'
+            example:
+              confirmationToken: CONFIRM_ERASE_CHILD_DATA
+      responses:
+        '200':
+          description: Child data erased successfully
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/EraseSuccessResponse'
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+        '429':
+          $ref: '#/components/responses/TooManyRequests'
+
+components:
+  securitySchemes:
+    bearerAuth:
+      type: http
+      scheme: bearer
+      bearerFormat: JWT
+
+  parameters:
+    ChildIdPath:
+      name: childId
+      in: path
+      required: true
+      description: UUID of the child account
+      schema:
+        type: string
+        format: uuid
+
+  schemas:
+    GuardianConfirmationRequest:
+      type: object
+      required: [confirmationToken]
+      properties:
+        confirmationToken:
+          type: string
+          description: Guardian confirmation token using [A-Za-z0-9_-], 12-128 chars
+          minLength: 12
+          maxLength: 128
+          pattern: '^[A-Za-z0-9_-]+$'
+
+    ExportPayload:
+      type: object
+      required: [exportedAt, childId, exportedByGuardianId, child]
+      properties:
+        exportedAt:
+          type: string
+          format: date-time
+        childId:
+          type: string
+          format: uuid
+        exportedByGuardianId:
+          type: string
+          format: uuid
+        child:
+          type: object
+          additionalProperties: true
+          description: Child user row excluding sensitive fields (e.g. password_hash)
+        guardianship:
+          type: object
+          additionalProperties: true
+        profile:
+          oneOf:
+            - type: object
+              additionalProperties: true
+            - type: 'null'
+        readingSessions:
+          type: array
+          items:
+            type: object
+            additionalProperties: true
+        mouseEvents:
+          type: array
+          items:
+            type: object
+            additionalProperties: true
+        sessionReplayEvents:
+          type: array
+          items:
+            type: object
+            additionalProperties: true
+        tokens:
+          type: array
+          items:
+            type: object
+            additionalProperties: true
+        redemptions:
+          type: array
+          items:
+            type: object
+            additionalProperties: true
+        reports:
+          type: array
+          items:
+            type: object
+            additionalProperties: true
+        otpCodes:
+          type: array
+          items:
+            type: object
+            additionalProperties: true
+
+    ErasePayload:
+      type: object
+      required: [erased, childId, erasedAt, deletedCounts]
+      properties:
+        erased:
+          type: boolean
+          example: true
+        childId:
+          type: string
+          format: uuid
+        erasedAt:
+          type: string
+          format: date-time
+        deletedCounts:
+          type: object
+          required:
+            [users, children_profiles, guardian_children, reading_sessions, mouse_events, session_replay_events, tokens, redemptions, reports, otp_codes]
+          properties:
+            users:
+              type: integer
+            children_profiles:
+              type: integer
+            guardian_children:
+              type: integer
+            reading_sessions:
+              type: integer
+            mouse_events:
+              type: integer
+            session_replay_events:
+              type: integer
+            tokens:
+              type: integer
+            redemptions:
+              type: integer
+            reports:
+              type: integer
+            otp_codes:
+              type: integer
+
+    ExportSuccessResponse:
+      type: object
+      properties:
+        success:
+          type: boolean
+          example: true
+        data:
+          $ref: '#/components/schemas/ExportPayload'
+        meta:
+          type: object
+          properties:
+            timestamp:
+              type: string
+              format: date-time
+
+    EraseSuccessResponse:
+      type: object
+      properties:
+        success:
+          type: boolean
+          example: true
+        data:
+          $ref: '#/components/schemas/ErasePayload'
+        meta:
+          type: object
+          properties:
+            timestamp:
+              type: string
+              format: date-time
+
+    ErrorResponse:
+      type: object
+      properties:
+        success:
+          type: boolean
+          example: false
+        error:
+          type: object
+          properties:
+            code:
+              type: string
+            message:
+              type: string
+            details:
+              type: array
+              items:
+                type: object
+                additionalProperties: true
+            timestamp:
+              type: string
+              format: date-time
+            path:
+              type: string
+
+  responses:
+    BadRequest:
+      description: Invalid childId or confirmationToken format
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/ErrorResponse'
+    Unauthorized:
+      description: Missing JWT or invalid confirmationToken
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/ErrorResponse'
+    Forbidden:
+      description: User is not guardian or guardian-child relationship does not exist
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/ErrorResponse'
+    TooManyRequests:
+      description: Per-guardian endpoint rate limit exceeded (1 request/minute)
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/ErrorResponse'

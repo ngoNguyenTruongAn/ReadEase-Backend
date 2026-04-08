@@ -49,6 +49,10 @@ class ContentController {
     return this.contentService.createContent(value, req.user);
   }
 
+  async getContentById(id) {
+    return this.contentService.getContentById(id);
+  }
+
   async updateContent(id, body) {
     const { error, value } = UpdateContentDto.schema.validate(body);
 
@@ -73,6 +77,18 @@ const getContentDescriptor = Object.getOwnPropertyDescriptor(
 );
 Reflect.decorate([Get()], ContentController.prototype, 'getContent', getContentDescriptor);
 Query()(ContentController.prototype, 'getContent', 0);
+
+const getContentByIdDescriptor = Object.getOwnPropertyDescriptor(
+  ContentController.prototype,
+  'getContentById',
+);
+Reflect.decorate(
+  [Get(':id')],
+  ContentController.prototype,
+  'getContentById',
+  getContentByIdDescriptor,
+);
+Param('id')(ContentController.prototype, 'getContentById', 0);
 
 const createContentDescriptor = Object.getOwnPropertyDescriptor(
   ContentController.prototype,

@@ -15,6 +15,7 @@
     "test": "jest",
     "test:watch": "jest --watch",
     "test:cov": "jest --coverage",
+    "test:guardian:integration": "jest src/modules/guardian/tests/guardian.integration.spec.js --runInBand",
     "test:debug": "node --inspect-brk node_modules/.bin/jest --runInBand",
     "test:e2e": "jest --config ./test/jest-e2e.json",
     "migration:run": "npx typeorm migration:run -d src/database/data-source.js",

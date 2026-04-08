@@ -29,6 +29,18 @@ const GEMINI_SCHEMA = {
 };
 
 /**
+ * Guardian Data API confirmation token schema
+ */
+const GUARDIAN_SCHEMA = {
+  GUARDIAN_EXPORT_CONFIRMATION_TOKEN: Joi.string()
+    .pattern(/^[A-Za-z0-9_-]{12,128}$/)
+    .default('CONFIRM_EXPORT_CHILD_DATA'),
+  GUARDIAN_ERASE_CONFIRMATION_TOKEN: Joi.string()
+    .pattern(/^[A-Za-z0-9_-]{12,128}$/)
+    .default('CONFIRM_ERASE_CHILD_DATA'),
+};
+
+/**
  * Combined Joi validation schema for ALL environment variables
  * App will CRASH on startup if required vars are missing.
  */
@@ -39,6 +51,7 @@ const validationSchema = Joi.object({
   ...JWT_SCHEMA,
   ...ML_SCHEMA,
   ...GEMINI_SCHEMA,
+  ...GUARDIAN_SCHEMA,
 });
 
 /**
