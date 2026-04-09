@@ -39,6 +39,16 @@ const UserEntity = new EntitySchema({
       type: 'timestamptz',
       nullable: true,
     },
+    guardian_invite_code: {
+      type: 'varchar',
+      length: 10,
+      nullable: true,
+      unique: true,
+    },
+    guardian_invite_code_expires_at: {
+      type: 'timestamptz',
+      nullable: true,
+    },
     created_at: {
       type: 'timestamptz',
       createDate: true,

@@ -141,6 +141,28 @@ describe('AuthService', () => {
     expect(otpService.verifyOTP).toHaveBeenCalledWith('uuid-1', '123456', 'EMAIL_VERIFY');
   });
 
+  it('should verify email and keep child account inactive, generating invite code', async () => {
+    const userRoleChild = {
+      id: 'uuid-2',
+      email: 'child@test.com',
+      role: 'ROLE_CHILD',
+      email_verified: false,
+      is_active: false,
+    };
+    repo.findOne.mockResolvedValue(userRoleChild);
+    repo.save.mockResolvedValue({});
+
+    const result = await service.verifyEmail({
+      email: 'child@test.com',
+      code: '654321',
+    });
+
+    expect(result.inviteCode).toBeDefined();
+    expect(userRoleChild.is_active).toBe(false);
+    expect(userRoleChild.guardian_invite_code).toBeDefined();
+    expect(userRoleChild.email_verified).toBe(true);
+  });
+
   // ── Login ──
   it('should reject login if email not verified', async () => {
     repo.findOne.mockResolvedValue({

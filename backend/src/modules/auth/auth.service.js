@@ -91,7 +91,20 @@ class AuthService {
 
     // Activate account
     user.email_verified = true;
-    user.is_active = true;
+
+    let inviteCode = null;
+    if (user.role === 'ROLE_CHILD' && !user.is_active) {
+      const crypto = require('crypto');
+      inviteCode = crypto.randomBytes(4).toString('hex').toUpperCase();
+      user.is_active = false; // Must be activated by Guardian
+      user.guardian_invite_code = inviteCode;
+      const expiresAt = new Date();
+      expiresAt.setDate(expiresAt.getDate() + 7);
+      user.guardian_invite_code_expires_at = expiresAt;
+    } else {
+      user.is_active = true;
+    }
+
     await this.userRepository.save(user);
 
     // Generate tokens
@@ -105,6 +118,7 @@ class AuthService {
     return {
       message: 'Email verified successfully!',
       ...tokens,
+      ...(inviteCode && { inviteCode }), // Include for frontend to display
       user: {
         id: user.id,
         email: user.email,
