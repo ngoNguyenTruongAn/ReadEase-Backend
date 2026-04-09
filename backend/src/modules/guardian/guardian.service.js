@@ -4,6 +4,9 @@ const {
   ForbiddenException,
   UnauthorizedException,
   InternalServerErrorException,
+  NotFoundException,
+  BadRequestException,
+  ConflictException,
 } = require('@nestjs/common');
 const { ConfigService } = require('@nestjs/config');
 const { InjectDataSource } = require('@nestjs/typeorm');
@@ -13,6 +16,108 @@ class GuardianService {
   constructor(dataSource, configService) {
     this.dataSource = dataSource;
     this.configService = configService;
+  }
+
+  async listChildren(guardianId) {
+    const rows = await this.dataSource.query(
+      `
+      SELECT c.id, c.email, c.display_name, c.is_active, c.created_at,
+             gc.consent_given_at, gc.consent_type,
+             cp.date_of_birth, cp.grade_level
+      FROM users c
+      JOIN guardian_children gc ON c.id = gc.child_id
+      LEFT JOIN children_profiles cp ON c.id = cp.user_id
+      WHERE gc.guardian_id = $1
+      ORDER BY gc.consent_given_at DESC
+      `,
+      [guardianId],
+    );
+
+    return rows;
+  }
+
+  async linkChild(guardianId, inviteCode) {
+    const queryRunner = this.dataSource.createQueryRunner();
+    await queryRunner.connect();
+    await queryRunner.startTransaction();
+
+    try {
+      const childRows = await queryRunner.manager.query(
+        `
+        SELECT id, guardian_invite_code_expires_at, is_active
+        FROM users
+        WHERE guardian_invite_code = $1
+          AND role = 'ROLE_CHILD'
+        FOR UPDATE
+        `,
+        [inviteCode],
+      );
+
+      if (childRows.length === 0) {
+        throw new NotFoundException('Invalid invite code or child not found');
+      }
+
+      const child = childRows[0];
+
+      if (child.is_active) {
+        throw new ConflictException('This child account is already active');
+      }
+
+      if (
+        child.guardian_invite_code_expires_at &&
+        new Date() > new Date(child.guardian_invite_code_expires_at)
+      ) {
+        throw new BadRequestException('Invite code has expired');
+      }
+
+      const existingLink = await queryRunner.manager.query(
+        `
+        SELECT 1 FROM guardian_children 
+        WHERE guardian_id = $1 AND child_id = $2
+        `,
+        [guardianId, child.id],
+      );
+
+      if (existingLink.length > 0) {
+        throw new ConflictException('You are already linked to this child');
+      }
+
+      await queryRunner.manager.query(
+        `
+        INSERT INTO guardian_children (guardian_id, child_id, consent_given_at, consent_type)
+        VALUES ($1, $2, NOW(), 'COPPA_PARENTAL')
+        `,
+        [guardianId, child.id],
+      );
+
+      await queryRunner.manager.query(
+        `
+        UPDATE users 
+        SET is_active = true, 
+            guardian_invite_code = NULL, 
+            guardian_invite_code_expires_at = NULL
+        WHERE id = $1
+        `,
+        [child.id],
+      );
+
+      await queryRunner.commitTransaction();
+
+      logger.info('Guardian linked child', {
+        context: 'GuardianService',
+        data: { guardianId, childId: child.id },
+      });
+
+      return {
+        message: 'Child linked successfully and account activated',
+        childId: child.id,
+      };
+    } catch (error) {
+      await queryRunner.rollbackTransaction();
+      throw error;
+    } finally {
+      await queryRunner.release();
+    }
   }
 
   getExpectedConfirmationToken(action) {

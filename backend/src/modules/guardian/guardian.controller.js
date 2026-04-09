@@ -3,6 +3,7 @@ require('reflect-metadata');
 const {
   Controller,
   Post,
+  Get,
   Delete,
   Param,
   Body,
@@ -16,6 +17,7 @@ const { Throttle } = require('@nestjs/throttler');
 
 const { GuardianService } = require('./guardian.service');
 const GuardianDataActionDto = require('./dto/guardian-data-action.dto');
+const LinkChildDto = require('./dto/link-child.dto');
 
 const { JwtAuthGuard } = require('../auth/guards/jwt-auth.guard');
 const { RolesGuard } = require('../auth/guards/roles.guard');
@@ -63,6 +65,18 @@ class GuardianController {
       validated.confirmationToken,
     );
   }
+
+  async listChildren(req) {
+    return this.guardianService.listChildren(req.user.sub);
+  }
+
+  async linkChild(body, req) {
+    const { error, value } = LinkChildDto.schema.validate(body);
+    if (error) {
+      throw new BadRequestException(error.details[0].message);
+    }
+    return this.guardianService.linkChild(req.user.sub, value.inviteCode);
+  }
 }
 
 Controller('api/v1/guardian')(GuardianController);
@@ -107,5 +121,30 @@ Reflect.decorate(
 Param('childId')(GuardianController.prototype, 'eraseChildData', 0);
 Body()(GuardianController.prototype, 'eraseChildData', 1);
 Req()(GuardianController.prototype, 'eraseChildData', 2);
+
+const listChildrenDescriptor = Object.getOwnPropertyDescriptor(
+  GuardianController.prototype,
+  'listChildren',
+);
+Reflect.decorate(
+  [Get('children'), HttpCode(200), UseGuards(JwtAuthGuard, RolesGuard), Roles('ROLE_GUARDIAN')],
+  GuardianController.prototype,
+  'listChildren',
+  listChildrenDescriptor,
+);
+Req()(GuardianController.prototype, 'listChildren', 0);
+
+const linkChildDescriptor = Object.getOwnPropertyDescriptor(
+  GuardianController.prototype,
+  'linkChild',
+);
+Reflect.decorate(
+  [Post('link-child'), HttpCode(200), UseGuards(JwtAuthGuard, RolesGuard), Roles('ROLE_GUARDIAN')],
+  GuardianController.prototype,
+  'linkChild',
+  linkChildDescriptor,
+);
+Body()(GuardianController.prototype, 'linkChild', 0);
+Req()(GuardianController.prototype, 'linkChild', 1);
 
 module.exports = { GuardianController };
