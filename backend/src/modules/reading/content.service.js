@@ -9,11 +9,13 @@
 const { Injectable, Inject, NotFoundException } = require('@nestjs/common');
 const { ContentRepository } = require('./content.repository');
 const { SegmentationAdapter } = require('./segmentation.adapter');
+const { StorageService } = require('../storage/storage.service');
 
 class ContentService {
-  constructor(contentRepository, segmentationAdapter) {
+  constructor(contentRepository, segmentationAdapter, storageService) {
     this.contentRepository = contentRepository;
     this.segmentationAdapter = segmentationAdapter;
+    this.storageService = storageService;
   }
 
   /**
@@ -38,8 +40,8 @@ class ContentService {
     return {
       id: content.id,
       title: content.title,
-      body: content.body,
-      body_segmented: content.body_segmented || null,
+      body_url: content.body_url || null, // New optimal data
+      body_segmented_url: content.body_segmented_url || null, // New optimal
       difficulty: content.difficulty,
       age_group: content.age_group,
       word_count: content.word_count,
@@ -96,10 +98,16 @@ class ContentService {
     const normalizedBody = this.normalizeText(dto.body);
     const bodySegmented = await this.segmentationAdapter.segment(dto.body);
 
+    const bodyBuffer = Buffer.from(normalizedBody, 'utf-8');
+    const segmentedBuffer = Buffer.from(bodySegmented, 'utf-8');
+
+    const bodyUpload = await this.storageService.upload(bodyBuffer, 'body.txt', 'text/plain', 'stories');
+    const segmentedUpload = await this.storageService.upload(segmentedBuffer, 'segmented.txt', 'text/plain', 'stories');
+
     const created = await this.contentRepository.createContent({
       title: dto.title,
-      body: normalizedBody,
-      body_segmented: bodySegmented,
+      body_url: bodyUpload.url,
+      body_segmented_url: segmentedUpload.url,
       difficulty: dto.difficulty,
       age_group: dto.age_group,
       word_count: this.calculateWordCount(bodySegmented),
@@ -120,9 +128,18 @@ class ContentService {
     const updatePayload = { ...dto };
 
     if (Object.prototype.hasOwnProperty.call(dto, 'body')) {
-      updatePayload.body = this.normalizeText(dto.body);
-      updatePayload.body_segmented = await this.segmentationAdapter.segment(dto.body);
-      updatePayload.word_count = this.calculateWordCount(updatePayload.body_segmented);
+      const normalizedBody = this.normalizeText(dto.body);
+      const bodySegmented = await this.segmentationAdapter.segment(dto.body);
+
+      const bodyBuffer = Buffer.from(normalizedBody, 'utf-8');
+      const segmentedBuffer = Buffer.from(bodySegmented, 'utf-8');
+
+      const bodyUpload = await this.storageService.upload(bodyBuffer, 'body.txt', 'text/plain', 'stories');
+      const segmentedUpload = await this.storageService.upload(segmentedBuffer, 'segmented.txt', 'text/plain', 'stories');
+
+      updatePayload.body_url = bodyUpload.url;
+      updatePayload.body_segmented_url = segmentedUpload.url;
+      updatePayload.word_count = this.calculateWordCount(bodySegmented);
     }
 
     const updated = await this.contentRepository.updateContent(id, updatePayload);
@@ -147,6 +164,7 @@ class ContentService {
 
 Inject(ContentRepository)(ContentService, undefined, 0);
 Inject(SegmentationAdapter)(ContentService, undefined, 1);
+Inject(StorageService)(ContentService, undefined, 2);
 Injectable()(ContentService);
 
 module.exports = { ContentService };

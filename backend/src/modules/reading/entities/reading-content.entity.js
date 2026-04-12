@@ -13,11 +13,14 @@ const ReadingContentEntity = new EntitySchema({
       type: 'varchar',
       length: 255,
     },
-    body: {
-      type: 'text',
+    body_url: {
+      type: 'varchar',
+      length: 1000,
+      nullable: true,
     },
-    body_segmented: {
-      type: 'text',
+    body_segmented_url: {
+      type: 'varchar',
+      length: 1000,
       nullable: true,
     },
     difficulty: {
