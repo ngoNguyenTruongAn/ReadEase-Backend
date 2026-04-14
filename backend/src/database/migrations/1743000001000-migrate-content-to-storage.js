@@ -1,5 +1,3 @@
-const { MigrationInterface, QueryRunner } = require('typeorm');
-
 module.exports = class MigrateContentToStorage1743000001000 {
   async up(queryRunner) {
     await queryRunner.query(`

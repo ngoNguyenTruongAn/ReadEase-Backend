@@ -5,6 +5,7 @@ describe('ContentService', () => {
   let service;
   let repository;
   let segmentationAdapter;
+  let storageService;
 
   beforeEach(() => {
     repository = {
@@ -28,7 +29,13 @@ describe('ContentService', () => {
       }),
     };
 
-    service = new ContentService(repository, segmentationAdapter);
+    storageService = {
+      upload: jest
+        .fn()
+        .mockResolvedValue({ url: 'https://storage.test/mock.txt', key: 'mock_key' }),
+    };
+
+    service = new ContentService(repository, segmentationAdapter, storageService);
   });
 
   afterEach(() => {
@@ -37,13 +44,13 @@ describe('ContentService', () => {
 
   // ─────────────────── Create ───────────────────
 
-  it('should create content with raw body and segmented body_segmented', async () => {
+  it('should create content and upload body to Supabase Storage', async () => {
     segmentationAdapter.segment.mockResolvedValue('con_bò ăn cỏ');
     repository.createContent.mockResolvedValue({
       id: 'content-1',
       title: 'Sample',
-      body: 'con bò ăn cỏ',
-      body_segmented: 'con_bò ăn cỏ',
+      body_url: 'https://storage.test/mock.txt',
+      body_segmented_url: 'https://storage.test/mock.txt',
       difficulty: 'EASY',
       age_group: '5-7',
       word_count: 3,
@@ -63,26 +70,27 @@ describe('ContentService', () => {
     );
 
     expect(segmentationAdapter.segment).toHaveBeenCalledWith('con bò ăn cỏ');
+    expect(storageService.upload).toHaveBeenCalledTimes(2);
     expect(repository.createContent).toHaveBeenCalledWith(
       expect.objectContaining({
-        body: 'con bò ăn cỏ',
-        body_segmented: 'con_bò ăn cỏ',
+        body_url: 'https://storage.test/mock.txt',
+        body_segmented_url: 'https://storage.test/mock.txt',
         word_count: 3,
       }),
     );
     expect(result).not.toHaveProperty('created_by');
     expect(result).not.toHaveProperty('deleted_at');
-    expect(result.body).toBe('con bò ăn cỏ');
-    expect(result.body_segmented).toBe('con_bò ăn cỏ');
+    expect(result.body_url).toBe('https://storage.test/mock.txt');
+    expect(result.body_segmented_url).toBe('https://storage.test/mock.txt');
   });
 
-  it('should store normalized body and segmented version separately', async () => {
+  it('should upload normalized body and segmented version separately', async () => {
     segmentationAdapter.segment.mockResolvedValue('con_bò ăn cỏ\n\ncon_chim bay');
     repository.createContent.mockResolvedValue({
       id: 'content-2',
       title: 'Spacing test',
-      body: 'con bò ăn cỏ\n\ncon chim bay',
-      body_segmented: 'con_bò ăn cỏ\n\ncon_chim bay',
+      body_url: 'https://storage.test/mock.txt',
+      body_segmented_url: 'https://storage.test/mock.txt',
       difficulty: 'EASY',
       age_group: '5-7',
       word_count: 5,
@@ -99,10 +107,12 @@ describe('ContentService', () => {
       { sub: 'clinician-1' },
     );
 
+    // Storage upload should be called with normalized body buffer
+    expect(storageService.upload).toHaveBeenCalledTimes(2);
     expect(repository.createContent).toHaveBeenCalledWith(
       expect.objectContaining({
-        body: 'con bò ăn cỏ\n\ncon chim bay',
-        body_segmented: 'con_bò ăn cỏ\n\ncon_chim bay',
+        body_url: 'https://storage.test/mock.txt',
+        body_segmented_url: 'https://storage.test/mock.txt',
         word_count: 5,
       }),
     );
@@ -114,8 +124,8 @@ describe('ContentService', () => {
     repository.createContent.mockResolvedValue({
       id: 'content-fallback',
       title: 'Fallback',
-      body: 'con bò ăn cỏ',
-      body_segmented: 'con bò ăn cỏ',
+      body_url: 'https://storage.test/mock.txt',
+      body_segmented_url: 'https://storage.test/mock.txt',
       difficulty: 'EASY',
       age_group: '5-7',
       word_count: 4,
@@ -132,18 +142,18 @@ describe('ContentService', () => {
       { sub: 'clinician-1' },
     );
 
-    // Even on fallback, create should succeed
+    // Even on fallback, create should succeed with URLs
     expect(result.id).toBe('content-fallback');
-    expect(result.body_segmented).toBe('con bò ăn cỏ');
+    expect(result.body_segmented_url).toBe('https://storage.test/mock.txt');
   });
 
   // ─────────────────── Update ───────────────────
 
-  it('should update body_segmented when body changes', async () => {
+  it('should re-upload to storage when body changes on update', async () => {
     repository.findById.mockResolvedValue({
       id: 'content-2',
       title: 'Old title',
-      body: 'Old body text that is long enough for the minimum validation constraint.',
+      body_url: 'https://storage.test/old.txt',
     });
     segmentationAdapter.segment.mockResolvedValue(
       'con_mèo chạy nhanh qua sân nhà trong chiều mưa nhẹ.',
@@ -151,8 +161,8 @@ describe('ContentService', () => {
     repository.updateContent.mockResolvedValue({
       id: 'content-2',
       title: 'New title',
-      body: 'con mèo chạy nhanh qua sân nhà trong chiều mưa nhẹ.',
-      body_segmented: 'con_mèo chạy nhanh qua sân nhà trong chiều mưa nhẹ.',
+      body_url: 'https://storage.test/mock.txt',
+      body_segmented_url: 'https://storage.test/mock.txt',
       difficulty: 'MEDIUM',
       age_group: '8-10',
       word_count: 10,
@@ -169,10 +179,12 @@ describe('ContentService', () => {
     expect(segmentationAdapter.segment).toHaveBeenCalledWith(
       'con mèo chạy nhanh qua sân nhà trong chiều mưa nhẹ.',
     );
+    expect(storageService.upload).toHaveBeenCalledTimes(2);
     expect(repository.updateContent).toHaveBeenCalledWith(
       'content-2',
       expect.objectContaining({
-        body_segmented: 'con_mèo chạy nhanh qua sân nhà trong chiều mưa nhẹ.',
+        body_url: 'https://storage.test/mock.txt',
+        body_segmented_url: 'https://storage.test/mock.txt',
       }),
     );
     expect(result.word_count).toBe(10);
@@ -182,13 +194,13 @@ describe('ContentService', () => {
     repository.findById.mockResolvedValue({
       id: 'content-3',
       title: 'Old title',
-      body: 'Some body',
+      body_url: 'https://storage.test/old.txt',
     });
     repository.updateContent.mockResolvedValue({
       id: 'content-3',
       title: 'Updated title',
-      body: 'Some body',
-      body_segmented: 'Some body',
+      body_url: 'https://storage.test/old.txt',
+      body_segmented_url: 'https://storage.test/old-seg.txt',
       difficulty: 'EASY',
       age_group: '5-7',
       word_count: 2,
@@ -198,16 +210,17 @@ describe('ContentService', () => {
     await service.updateContent('content-3', { title: 'Updated title' });
 
     expect(segmentationAdapter.segment).not.toHaveBeenCalled();
+    expect(storageService.upload).not.toHaveBeenCalled();
   });
 
   // ─────────────────── Read ───────────────────
 
-  it('should include body_segmented in content detail', async () => {
+  it('should include body_url and body_segmented_url in content detail', async () => {
     repository.findById.mockResolvedValue({
       id: 'content-42',
       title: 'Chi tiet',
-      body: 'con bò ăn cỏ',
-      body_segmented: 'con_bò ăn cỏ',
+      body_url: 'https://storage.test/body.txt',
+      body_segmented_url: 'https://storage.test/seg.txt',
       difficulty: 'EASY',
       age_group: '5-7',
       word_count: 3,
@@ -217,8 +230,8 @@ describe('ContentService', () => {
 
     const result = await service.getContentById('content-42');
 
-    expect(result.body).toBe('con bò ăn cỏ');
-    expect(result.body_segmented).toBe('con_bò ăn cỏ');
+    expect(result.body_url).toBe('https://storage.test/body.txt');
+    expect(result.body_segmented_url).toBe('https://storage.test/seg.txt');
   });
 
   it('should return paginated content without body fields', async () => {
@@ -226,8 +239,8 @@ describe('ContentService', () => {
       {
         id: 'a',
         title: 'A',
-        body: 'Body A',
-        body_segmented: 'Body A',
+        body_url: 'https://storage.test/a.txt',
+        body_segmented_url: 'https://storage.test/a-seg.txt',
         difficulty: 'EASY',
         age_group: '5-7',
         word_count: 2,
@@ -291,8 +304,8 @@ describe('ContentService', () => {
     repository.createContent.mockResolvedValue({
       id: 'content-empty',
       title: 'Empty',
-      body: '',
-      body_segmented: '',
+      body_url: 'https://storage.test/mock.txt',
+      body_segmented_url: 'https://storage.test/mock.txt',
       difficulty: 'EASY',
       age_group: '5-7',
       word_count: 0,
