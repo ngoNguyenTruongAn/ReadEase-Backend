@@ -1,0 +1,120 @@
+# ──────────────────────────────────────────────
+# ReadEase — Production Docker Compose
+# Usage: docker compose -f docker-compose.prod.yml up -d
+# ──────────────────────────────────────────────
+
+services:
+  # ──────────────────────────────────────────────
+  # 1. NestJS Backend API
+  # ──────────────────────────────────────────────
+  api:
+    build:
+      context: ./backend
+      dockerfile: Dockerfile
+    container_name: readease_api
+    restart: always
+    ports:
+      - "${APP_PORT:-3000}:3000"
+    environment:
+      - NODE_ENV=production
+      - APP_PORT=3000
+      - APP_ENV=production
+      - LOG_LEVEL=${LOG_LEVEL:-info}
+      - DB_HOST=postgres
+      - DB_PORT=5432
+      - DB_NAME=${POSTGRES_DB:-readease}
+      - DB_USER=${POSTGRES_USER:-readease_app}
+      - DB_PASSWORD=${POSTGRES_PASSWORD}
+      - REDIS_HOST=redis
+      - REDIS_PORT=6379
+      - JWT_SECRET=${JWT_SECRET}
+      - JWT_ACCESS_TTL=${JWT_ACCESS_TTL:-900}
+      - JWT_REFRESH_TTL=${JWT_REFRESH_TTL:-604800}
+      - ML_ENGINE_URL=http://ml-engine:8000
+      - ML_TIMEOUT_MS=${ML_TIMEOUT_MS:-5000}
+      - SUPABASE_URL=${SUPABASE_URL}
+      - SUPABASE_SERVICE_KEY=${SUPABASE_SERVICE_KEY}
+      - SUPABASE_BUCKET=${SUPABASE_BUCKET:-media}
+      - GEMINI_API_KEY=${GEMINI_API_KEY:-}
+      - GEMINI_MODEL=${GEMINI_MODEL:-gemini-2.0-flash}
+      - SMTP_HOST=${SMTP_HOST:-}
+      - SMTP_PORT=${SMTP_PORT:-587}
+      - SMTP_USER=${SMTP_USER:-}
+      - SMTP_PASS=${SMTP_PASS:-}
+    depends_on:
+      postgres:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+    networks:
+      - readease-network
+
+  # ──────────────────────────────────────────────
+  # 2. PostgreSQL 16 Database
+  # ──────────────────────────────────────────────
+  postgres:
+    image: postgres:16-alpine
+    container_name: readease_db
+    restart: always
+    environment:
+      POSTGRES_DB: ${POSTGRES_DB:-readease}
+      POSTGRES_USER: ${POSTGRES_USER:-readease_app}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD}
+    volumes:
+      - pgdata:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U ${POSTGRES_USER:-readease_app} -d ${POSTGRES_DB:-readease}"]
+      interval: 5s
+      timeout: 5s
+      retries: 5
+      start_period: 10s
+    networks:
+      - readease-network
+
+  # ──────────────────────────────────────────────
+  # 3. Redis 7 Cache
+  # ──────────────────────────────────────────────
+  redis:
+    image: redis:7-alpine
+    container_name: readease_redis
+    restart: always
+    volumes:
+      - redisdata:/data
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 5s
+      timeout: 3s
+      retries: 5
+      start_period: 5s
+    networks:
+      - readease-network
+
+  # ──────────────────────────────────────────────
+  # 4. ML Engine — Python FastAPI
+  # ──────────────────────────────────────────────
+  ml-engine:
+    build:
+      context: ./ml-service
+      dockerfile: Dockerfile
+    container_name: readease_ml
+    restart: always
+    environment:
+      - PYTHONUNBUFFERED=1
+    networks:
+      - readease-network
+
+# ──────────────────────────────────────────────
+# Named Volumes (persistent data)
+# ──────────────────────────────────────────────
+volumes:
+  pgdata:
+    driver: local
+  redisdata:
+    driver: local
+
+# ──────────────────────────────────────────────
+# Network
+# ──────────────────────────────────────────────
+networks:
+  readease-network:
+    driver: bridge
