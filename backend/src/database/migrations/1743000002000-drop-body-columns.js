@@ -1,5 +1,3 @@
-const { MigrationInterface, QueryRunner } = require('typeorm');
-
 module.exports = class DropBodyColumns1743000002000 {
   async up(queryRunner) {
     await queryRunner.query(`

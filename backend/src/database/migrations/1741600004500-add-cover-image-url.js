@@ -7,8 +7,8 @@
  * - up() and down() methods
  */
 
-module.exports = class AddCoverImageUrl1710752892000 {
-  name = 'AddCoverImageUrl1710752892000';
+module.exports = class AddCoverImageUrl1741600004500 {
+  name = 'AddCoverImageUrl1741600004500';
 
   async up(queryRunner) {
     await queryRunner.query(`

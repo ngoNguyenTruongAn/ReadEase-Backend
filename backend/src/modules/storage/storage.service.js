@@ -49,7 +49,16 @@ class StorageService {
       const { error } = await this.supabase.storage.createBucket(this.bucket, {
         public: true,
         fileSizeLimit: 10 * 1024 * 1024, // 10 MB max
-        allowedMimeTypes: ['image/png', 'image/jpeg', 'image/gif', 'image/svg+xml', 'image/webp', 'text/plain', 'application/json'],
+        allowedMimeTypes: [
+          'image/png',
+          'image/jpeg',
+          'image/gif',
+          'image/svg+xml',
+          'image/webp',
+          'text/plain',
+          'text/plain; charset=utf-8',
+          'application/json',
+        ],
       });
 
       if (error) {
@@ -65,7 +74,16 @@ class StorageService {
       const { error } = await this.supabase.storage.updateBucket(this.bucket, {
         public: true,
         fileSizeLimit: 10 * 1024 * 1024,
-        allowedMimeTypes: ['image/png', 'image/jpeg', 'image/gif', 'image/svg+xml', 'image/webp', 'text/plain', 'application/json'],
+        allowedMimeTypes: [
+          'image/png',
+          'image/jpeg',
+          'image/gif',
+          'image/svg+xml',
+          'image/webp',
+          'text/plain',
+          'text/plain; charset=utf-8',
+          'application/json',
+        ],
       });
       if (error) {
         logger.error('Update bucket config failed', {

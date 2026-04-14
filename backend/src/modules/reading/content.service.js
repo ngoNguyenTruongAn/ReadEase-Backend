@@ -101,8 +101,18 @@ class ContentService {
     const bodyBuffer = Buffer.from(normalizedBody, 'utf-8');
     const segmentedBuffer = Buffer.from(bodySegmented, 'utf-8');
 
-    const bodyUpload = await this.storageService.upload(bodyBuffer, 'body.txt', 'text/plain', 'stories');
-    const segmentedUpload = await this.storageService.upload(segmentedBuffer, 'segmented.txt', 'text/plain', 'stories');
+    const bodyUpload = await this.storageService.upload(
+      bodyBuffer,
+      'body.txt',
+      'text/plain; charset=utf-8',
+      'stories',
+    );
+    const segmentedUpload = await this.storageService.upload(
+      segmentedBuffer,
+      'segmented.txt',
+      'text/plain; charset=utf-8',
+      'stories',
+    );
 
     const created = await this.contentRepository.createContent({
       title: dto.title,
@@ -134,12 +144,23 @@ class ContentService {
       const bodyBuffer = Buffer.from(normalizedBody, 'utf-8');
       const segmentedBuffer = Buffer.from(bodySegmented, 'utf-8');
 
-      const bodyUpload = await this.storageService.upload(bodyBuffer, 'body.txt', 'text/plain', 'stories');
-      const segmentedUpload = await this.storageService.upload(segmentedBuffer, 'segmented.txt', 'text/plain', 'stories');
+      const bodyUpload = await this.storageService.upload(
+        bodyBuffer,
+        'body.txt',
+        'text/plain; charset=utf-8',
+        'stories',
+      );
+      const segmentedUpload = await this.storageService.upload(
+        segmentedBuffer,
+        'segmented.txt',
+        'text/plain; charset=utf-8',
+        'stories',
+      );
 
       updatePayload.body_url = bodyUpload.url;
       updatePayload.body_segmented_url = segmentedUpload.url;
       updatePayload.word_count = this.calculateWordCount(bodySegmented);
+      delete updatePayload.body;
     }
 
     const updated = await this.contentRepository.updateContent(id, updatePayload);
