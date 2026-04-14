@@ -104,13 +104,13 @@ class ContentService {
     const bodyUpload = await this.storageService.upload(
       bodyBuffer,
       'body.txt',
-      'text/plain',
+      'text/plain; charset=utf-8',
       'stories',
     );
     const segmentedUpload = await this.storageService.upload(
       segmentedBuffer,
       'segmented.txt',
-      'text/plain',
+      'text/plain; charset=utf-8',
       'stories',
     );
 
@@ -147,19 +147,20 @@ class ContentService {
       const bodyUpload = await this.storageService.upload(
         bodyBuffer,
         'body.txt',
-        'text/plain',
+        'text/plain; charset=utf-8',
         'stories',
       );
       const segmentedUpload = await this.storageService.upload(
         segmentedBuffer,
         'segmented.txt',
-        'text/plain',
+        'text/plain; charset=utf-8',
         'stories',
       );
 
       updatePayload.body_url = bodyUpload.url;
       updatePayload.body_segmented_url = segmentedUpload.url;
       updatePayload.word_count = this.calculateWordCount(bodySegmented);
+      delete updatePayload.body;
     }
 
     const updated = await this.contentRepository.updateContent(id, updatePayload);

@@ -75,7 +75,12 @@ const getContentDescriptor = Object.getOwnPropertyDescriptor(
   ContentController.prototype,
   'getContent',
 );
-Reflect.decorate([Get()], ContentController.prototype, 'getContent', getContentDescriptor);
+Reflect.decorate(
+  [Get(), UseGuards(JwtAuthGuard, RolesGuard), Roles('ROLE_CHILD', 'ROLE_CLINICIAN', 'ROLE_GUARDIAN')],
+  ContentController.prototype,
+  'getContent',
+  getContentDescriptor,
+);
 Query()(ContentController.prototype, 'getContent', 0);
 
 const getContentByIdDescriptor = Object.getOwnPropertyDescriptor(
@@ -83,7 +88,7 @@ const getContentByIdDescriptor = Object.getOwnPropertyDescriptor(
   'getContentById',
 );
 Reflect.decorate(
-  [Get(':id')],
+  [Get(':id'), UseGuards(JwtAuthGuard, RolesGuard), Roles('ROLE_CHILD', 'ROLE_CLINICIAN', 'ROLE_GUARDIAN')],
   ContentController.prototype,
   'getContentById',
   getContentByIdDescriptor,

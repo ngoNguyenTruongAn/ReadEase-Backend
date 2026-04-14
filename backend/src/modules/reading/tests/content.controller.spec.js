@@ -142,16 +142,18 @@ describe('ContentController', () => {
     ).rejects.toThrow(NotFoundException);
   });
 
-  it('RBAC metadata should restrict write endpoints to ROLE_CLINICIAN', () => {
+  it('RBAC metadata should restrict write endpoints to ROLE_CLINICIAN and read endpoints to all roles', () => {
     const createRoles = Reflect.getMetadata('roles', ContentController.prototype.createContent);
     const updateRoles = Reflect.getMetadata('roles', ContentController.prototype.updateContent);
     const deleteRoles = Reflect.getMetadata('roles', ContentController.prototype.deleteContent);
     const getRoles = Reflect.getMetadata('roles', ContentController.prototype.getContent);
+    const getByIdRoles = Reflect.getMetadata('roles', ContentController.prototype.getContentById);
 
     expect(createRoles).toEqual(['ROLE_CLINICIAN']);
     expect(updateRoles).toEqual(['ROLE_CLINICIAN']);
     expect(deleteRoles).toEqual(['ROLE_CLINICIAN']);
-    expect(getRoles).toBeUndefined();
+    expect(getRoles).toEqual(['ROLE_CHILD', 'ROLE_CLINICIAN', 'ROLE_GUARDIAN']);
+    expect(getByIdRoles).toEqual(['ROLE_CHILD', 'ROLE_CLINICIAN', 'ROLE_GUARDIAN']);
   });
 
   it('RBAC guard should deny guardian and child, allow clinician on protected endpoint', () => {

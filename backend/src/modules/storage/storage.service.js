@@ -56,6 +56,7 @@ class StorageService {
           'image/svg+xml',
           'image/webp',
           'text/plain',
+          'text/plain; charset=utf-8',
           'application/json',
         ],
       });
@@ -80,6 +81,7 @@ class StorageService {
           'image/svg+xml',
           'image/webp',
           'text/plain',
+          'text/plain; charset=utf-8',
           'application/json',
         ],
       });
