@@ -65,7 +65,8 @@ describe('ContentController', () => {
       expect.objectContaining({ title: 'Story' }),
       req.user,
     );
-    expect(result.id).toBe('content-1');
+    expect(result.data.id).toBe('content-1');
+    expect(result.message).toBe('Created reading content successfully');
   });
 
   it('GET /content/:id should return full content detail', async () => {
@@ -106,7 +107,8 @@ describe('ContentController', () => {
       title: 'Updated',
       body: 'This updated body is long enough to meet validation and test update flow correctly.',
     });
-    expect(result.title).toBe('Updated');
+    expect(result.data.title).toBe('Updated');
+    expect(result.message).toBe('Updated reading content successfully');
   });
 
   it('DELETE /content/:id should soft delete content', async () => {

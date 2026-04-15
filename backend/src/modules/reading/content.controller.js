@@ -46,7 +46,10 @@ class ContentController {
       throw new BadRequestException(error.details[0].message);
     }
 
-    return this.contentService.createContent(value, req.user);
+    return {
+      message: 'Created reading content successfully',
+      data: await this.contentService.createContent(value, req.user),
+    };
   }
 
   async getContentById(id) {
@@ -60,7 +63,10 @@ class ContentController {
       throw new BadRequestException(error.details[0].message);
     }
 
-    return this.contentService.updateContent(id, value);
+    return {
+      message: 'Updated reading content successfully',
+      data: await this.contentService.updateContent(id, value),
+    };
   }
 
   async deleteContent(id) {
