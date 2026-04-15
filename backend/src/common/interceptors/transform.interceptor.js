@@ -23,25 +23,42 @@ class TransformInterceptor {
   intercept(context, next) {
     return next.handle().pipe(
       map((responseData) => {
-        // If response already has { data, meta } shape (paginated), use it
-        if (responseData && responseData.data !== undefined && responseData.meta !== undefined) {
-          return {
-            success: true,
-            data: responseData.data,
-            meta: {
+        let message = undefined;
+        let data = responseData;
+        let meta = { timestamp: new Date().toISOString() };
+
+        if (responseData && typeof responseData === 'object') {
+          // Extract message if present
+          if (responseData.message) {
+            message = responseData.message;
+          }
+
+          // If response is the new structured format { message, data } OR { data, meta }
+          if (responseData.data !== undefined) {
+            data = responseData.data;
+          } else if (responseData.message && Object.keys(responseData).length === 1) {
+            // If the controller only returned { message }, then data can be null
+            data = null;
+          } else if (responseData.message) {
+            // If there's a message and other fields, just keep the data as is (minus the message maybe? For safely, let's keep it as is, or remove message)
+            const { message: _, ...rest } = responseData;
+            data = rest;
+          }
+
+          // Extract meta if present
+          if (responseData.meta !== undefined) {
+            meta = {
               ...responseData.meta,
-              timestamp: new Date().toISOString(),
-            },
-          };
+              ...meta,
+            };
+          }
         }
 
-        // Otherwise wrap the raw data
         return {
           success: true,
-          data: responseData,
-          meta: {
-            timestamp: new Date().toISOString(),
-          },
+          ...(message && { message }),
+          data,
+          meta,
         };
       }),
     );

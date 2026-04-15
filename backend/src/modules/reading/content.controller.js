@@ -46,7 +46,10 @@ class ContentController {
       throw new BadRequestException(error.details[0].message);
     }
 
-    return this.contentService.createContent(value, req.user);
+    return {
+      message: 'Created reading content successfully',
+      data: await this.contentService.createContent(value, req.user),
+    };
   }
 
   async getContentById(id) {
@@ -60,7 +63,10 @@ class ContentController {
       throw new BadRequestException(error.details[0].message);
     }
 
-    return this.contentService.updateContent(id, value);
+    return {
+      message: 'Updated reading content successfully',
+      data: await this.contentService.updateContent(id, value),
+    };
   }
 
   async deleteContent(id) {
@@ -76,7 +82,11 @@ const getContentDescriptor = Object.getOwnPropertyDescriptor(
   'getContent',
 );
 Reflect.decorate(
-  [Get(), UseGuards(JwtAuthGuard, RolesGuard), Roles('ROLE_CHILD', 'ROLE_CLINICIAN', 'ROLE_GUARDIAN')],
+  [
+    Get(),
+    UseGuards(JwtAuthGuard, RolesGuard),
+    Roles('ROLE_CHILD', 'ROLE_CLINICIAN', 'ROLE_GUARDIAN'),
+  ],
   ContentController.prototype,
   'getContent',
   getContentDescriptor,
@@ -88,7 +98,11 @@ const getContentByIdDescriptor = Object.getOwnPropertyDescriptor(
   'getContentById',
 );
 Reflect.decorate(
-  [Get(':id'), UseGuards(JwtAuthGuard, RolesGuard), Roles('ROLE_CHILD', 'ROLE_CLINICIAN', 'ROLE_GUARDIAN')],
+  [
+    Get(':id'),
+    UseGuards(JwtAuthGuard, RolesGuard),
+    Roles('ROLE_CHILD', 'ROLE_CLINICIAN', 'ROLE_GUARDIAN'),
+  ],
   ContentController.prototype,
   'getContentById',
   getContentByIdDescriptor,
