@@ -93,11 +93,7 @@ class AuthController {
 
   // ── GET /auth/profile (Protected: JwtAuthGuard + RolesGuard) ──
   async getProfile(req) {
-    return {
-      id: req.user.sub,
-      email: req.user.email,
-      role: req.user.role,
-    };
+    return this.authService.getProfile(req.user.sub);
   }
 
   // ── POST /auth/forgot-password (Public) ──
