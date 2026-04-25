@@ -6,11 +6,7 @@
  * and persists the result into the reports table.
  */
 
-const {
-  Injectable,
-  NotFoundException,
-  ConflictException,
-} = require('@nestjs/common');
+const { Injectable, NotFoundException, ConflictException } = require('@nestjs/common');
 const { InjectRepository } = require('@nestjs/typeorm');
 const { Between } = require('typeorm');
 

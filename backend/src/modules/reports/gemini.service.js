@@ -102,10 +102,21 @@ class GeminiService {
         isFallback: false,
       };
     } catch (error) {
-      logger.error('Gemini API call failed, falling back to local report', {
-        context: 'GeminiService',
-        data: { error: error.message },
-      });
+      // Detect quota-exceeded (429) errors specifically for clearer monitoring
+      const isQuotaError =
+        error.message?.includes('429') || error.message?.includes('quota');
+
+      if (isQuotaError) {
+        logger.warn('Gemini API quota exceeded (429) — using fallback report. Check your plan and billing at https://ai.google.dev/gemini-api/docs/rate-limits', {
+          context: 'GeminiService',
+          data: { model: this.modelName, error: error.message },
+        });
+      } else {
+        logger.error('Gemini API call failed, falling back to local report', {
+          context: 'GeminiService',
+          data: { error: error.message },
+        });
+      }
 
       return {
         content: this._buildFallbackReport(data),
@@ -125,14 +136,15 @@ class GeminiService {
    * that is encouraging and easy for parents to understand.
    */
   _buildPrompt(data) {
-    const booksList = data.booksRead.length > 0
-      ? data.booksRead
-          .map(
-            (b, i) =>
-              `  ${i + 1}. "${b.title}" (Difficulty: ${b.difficulty || 'N/A'}, Words: ${b.wordCount || 'N/A'})`,
-          )
-          .join('\n')
-      : '  (No books completed this week)';
+    const booksList =
+      data.booksRead.length > 0
+        ? data.booksRead
+            .map(
+              (b, i) =>
+                `  ${i + 1}. "${b.title}" (Difficulty: ${b.difficulty || 'N/A'}, Words: ${b.wordCount || 'N/A'})`,
+            )
+            .join('\n')
+        : '  (No books completed this week)';
 
     return `
 You are an educational AI assistant for ReadEase, a platform that helps children with Dyslexia improve their reading skills. Your job is to write a WEEKLY PROGRESS REPORT for a parent or guardian.
@@ -174,11 +186,12 @@ Generate the report now:
    * Used when the API key is missing or the API fails.
    */
   _buildFallbackReport(data) {
-    const booksList = data.booksRead.length > 0
-      ? data.booksRead
-          .map((b) => `- **${b.title}** (${b.difficulty || 'N/A'}, ${b.wordCount || '?'} từ)`)
-          .join('\n')
-      : '- _Chưa có nội dung nào được hoàn thành trong tuần này._';
+    const booksList =
+      data.booksRead.length > 0
+        ? data.booksRead
+            .map((b) => `- **${b.title}** (${b.difficulty || 'N/A'}, ${b.wordCount || '?'} từ)`)
+            .join('\n')
+        : '- _Chưa có nội dung nào được hoàn thành trong tuần này._';
 
     const effortPercent = (data.averageEffortScore * 100).toFixed(0);
 
@@ -202,9 +215,11 @@ Generate the report now:
 ${booksList}
 
 ## 💡 Nhận Xét
-${data.totalSessions > 0
+${
+  data.totalSessions > 0
     ? `Bé đã hoàn thành **${data.totalSessions} phiên đọc** trong tuần này. Hãy tiếp tục duy trì thói quen đọc mỗi ngày để cải thiện kỹ năng đọc nhé!`
-    : 'Tuần này bé chưa có phiên đọc nào được ghi nhận. Hãy khuyến khích bé dành ít nhất 10-15 phút mỗi ngày để luyện đọc nhé!'}
+    : 'Tuần này bé chưa có phiên đọc nào được ghi nhận. Hãy khuyến khích bé dành ít nhất 10-15 phút mỗi ngày để luyện đọc nhé!'
+}
 
 ---
 *Báo cáo này được tạo tự động bởi hệ thống ReadEase.*

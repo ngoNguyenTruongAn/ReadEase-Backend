@@ -86,6 +86,11 @@ class ReportsController {
       if (isNaN(weekEnd.getTime())) {
         throw new BadRequestException('Invalid weekEnd date format');
       }
+      // If only a date string was provided (no time component), set to end of day
+      // so that sessions created on this day are included in the range
+      if (typeof body.weekEnd === 'string' && body.weekEnd.length <= 10) {
+        weekEnd.setHours(23, 59, 59, 999);
+      }
     } else {
       weekEnd = new Date(now.getFullYear(), now.getMonth(), now.getDate(), 23, 59, 59, 999);
     }
@@ -94,6 +99,10 @@ class ReportsController {
       weekStart = new Date(body.weekStart);
       if (isNaN(weekStart.getTime())) {
         throw new BadRequestException('Invalid weekStart date format');
+      }
+      // If only a date string was provided, set to start of day
+      if (typeof body.weekStart === 'string' && body.weekStart.length <= 10) {
+        weekStart.setHours(0, 0, 0, 0);
       }
     } else {
       weekStart = new Date(weekEnd);
@@ -138,11 +147,7 @@ const listReportsDescriptor = Object.getOwnPropertyDescriptor(
   'listReports',
 );
 Reflect.decorate(
-  [
-    Get(':childId'),
-    UseGuards(JwtAuthGuard, RolesGuard),
-    Roles('ROLE_CLINICIAN', 'ROLE_GUARDIAN'),
-  ],
+  [Get(':childId'), UseGuards(JwtAuthGuard, RolesGuard), Roles('ROLE_CLINICIAN', 'ROLE_GUARDIAN')],
   ReportsController.prototype,
   'listReports',
   listReportsDescriptor,

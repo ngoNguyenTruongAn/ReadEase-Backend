@@ -1,0 +1,361 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8"/>
+  <title>ReadEase — System Context Diagram</title>
+  <style>
+    * { box-sizing: border-box; margin: 0; padding: 0; }
+    body {
+      background: #f0f4f8;
+      font-family: 'Segoe UI', Arial, sans-serif;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      padding: 32px 24px 48px;
+    }
+    h1 { font-size: 21px; font-weight: 700; color: #1a237e; margin-bottom: 4px; }
+    p  { font-size: 12px; color: #78909c; margin-bottom: 24px; }
+    svg {
+      background: #fff;
+      border-radius: 14px;
+      box-shadow: 0 4px 24px rgba(0,0,0,0.10);
+      border: 1px solid #e0e0e0;
+    }
+  </style>
+</head>
+<body>
+<h1>ReadEase — System Context Diagram</h1>
+<p>C4 Model Level 1 &nbsp;·&nbsp; v2.1 &nbsp;·&nbsp; 25/04/2026</p>
+
+<!--
+  COORDINATE SYSTEM  (all values are exact SVG units, no JS needed)
+  ─────────────────────────────────────────────────────────────────
+  Actors (left column)        x=30..178
+  Main System ellipse         cx=530, cy=310, rx=155, ry=95
+  External Systems (top-right) x=740..1060, y=45..140
+  Internal Systems (bottom)    x=40..710, y=590..690
+-->
+
+<svg width="1120" height="760" viewBox="0 0 1120 760"
+     xmlns="http://www.w3.org/2000/svg"
+     font-family="'Segoe UI', Arial, sans-serif">
+
+  <defs>
+    <!-- Arrow markers — each color has its own -->
+    <marker id="m-gray"   markerWidth="9" markerHeight="9" refX="8" refY="3.5" orient="auto">
+      <path d="M0,0 L0,7 L9,3.5 z" fill="#546e7a"/>
+    </marker>
+    <marker id="m-green"  markerWidth="9" markerHeight="9" refX="8" refY="3.5" orient="auto">
+      <path d="M0,0 L0,7 L9,3.5 z" fill="#388e3c"/>
+    </marker>
+    <marker id="m-blue"   markerWidth="9" markerHeight="9" refX="8" refY="3.5" orient="auto">
+      <path d="M0,0 L0,7 L9,3.5 z" fill="#1976d2"/>
+    </marker>
+    <marker id="m-purple" markerWidth="9" markerHeight="9" refX="8" refY="3.5" orient="auto">
+      <path d="M0,0 L0,7 L9,3.5 z" fill="#7b1fa2"/>
+    </marker>
+    <marker id="m-orange" markerWidth="9" markerHeight="9" refX="8" refY="3.5" orient="auto">
+      <path d="M0,0 L0,7 L9,3.5 z" fill="#e65100"/>
+    </marker>
+
+    <!-- Drop shadow filter -->
+    <filter id="shadow" x="-10%" y="-10%" width="120%" height="120%">
+      <feDropShadow dx="0" dy="2" stdDeviation="3" flood-opacity="0.10"/>
+    </filter>
+  </defs>
+
+  <!-- ════════════════════════════════════════════════════
+       ZONE: External Cloud Services  (top-right)
+  ════════════════════════════════════════════════════ -->
+  <rect x="730" y="35" width="368" height="135" rx="10"
+        fill="rgba(227,242,253,0.25)" stroke="#1976d2" stroke-width="1.5" stroke-dasharray="8,5"/>
+  <text x="748" y="56" font-size="11" font-weight="700" fill="#1565c0"
+        letter-spacing="0.5">EXTERNAL CLOUD SERVICES</text>
+
+  <!-- ════════════════════════════════════════════════════
+       ZONE: Internal Infrastructure  (bottom)
+  ════════════════════════════════════════════════════ -->
+  <rect x="25" y="578" width="700" height="130" rx="10"
+        fill="rgba(255,253,231,0.35)" stroke="#f9a825" stroke-width="1.5" stroke-dasharray="8,5"/>
+  <text x="43" y="598" font-size="11" font-weight="700" fill="#e65100"
+        letter-spacing="0.5">INTERNAL INFRASTRUCTURE</text>
+
+  <!-- ════════════════════════════════════════════════════
+       ACTORS
+       Children  → center (104, 105)
+       Guardian  → center (104, 325)
+       Clinician → center (104, 470)
+  ════════════════════════════════════════════════════ -->
+
+  <!-- Children -->
+  <rect x="30" y="70" width="148" height="70" rx="8"
+        fill="#fff" stroke="#546e7a" stroke-width="2" filter="url(#shadow)"/>
+  <text x="104" y="100" text-anchor="middle" font-size="14" font-weight="700" fill="#1a237e">Children</text>
+  <text x="104" y="118" text-anchor="middle" font-size="10" fill="#607d8b">Student / Young Reader</text>
+
+  <!-- Guardian -->
+  <rect x="30" y="290" width="148" height="70" rx="8"
+        fill="#fff" stroke="#546e7a" stroke-width="2" filter="url(#shadow)"/>
+  <text x="104" y="320" text-anchor="middle" font-size="14" font-weight="700" fill="#1a237e">Guardian</text>
+  <text x="104" y="338" text-anchor="middle" font-size="10" fill="#607d8b">Parent / Caregiver</text>
+
+  <!-- Clinician -->
+  <rect x="30" y="435" width="148" height="70" rx="8"
+        fill="#fff" stroke="#546e7a" stroke-width="2" filter="url(#shadow)"/>
+  <text x="104" y="465" text-anchor="middle" font-size="14" font-weight="700" fill="#1a237e">Clinician</text>
+  <text x="104" y="483" text-anchor="middle" font-size="10" fill="#607d8b">Teacher / Specialist</text>
+
+  <!-- ════════════════════════════════════════════════════
+       MAIN SYSTEM — ellipse cx=530 cy=310 rx=155 ry=95
+  ════════════════════════════════════════════════════ -->
+  <ellipse cx="530" cy="310" rx="155" ry="95"
+           fill="url(#grad-main)" stroke="#37474f" stroke-width="3" filter="url(#shadow)"/>
+  <defs>
+    <radialGradient id="grad-main" cx="40%" cy="35%">
+      <stop offset="0%"   stop-color="#e8eaf6"/>
+      <stop offset="100%" stop-color="#cfd8dc"/>
+    </radialGradient>
+  </defs>
+  <text x="530" y="295" text-anchor="middle" font-size="18" font-weight="800" fill="#1a237e">ReadEase</text>
+  <text x="530" y="316" text-anchor="middle" font-size="11" fill="#546e7a">NestJS API · Port :3000</text>
+  <text x="530" y="334" text-anchor="middle" font-size="10" fill="#78909c">WebSocket Gateway + REST API</text>
+
+  <!-- ════════════════════════════════════════════════════
+       EXTERNAL SYSTEMS
+       Gemini   → center (812, 100)
+       Supabase → center (978, 100)
+  ════════════════════════════════════════════════════ -->
+
+  <!-- Google Gemini API -->
+  <rect x="738" y="65" width="148" height="70" rx="8"
+        fill="#e3f2fd" stroke="#1976d2" stroke-width="2" filter="url(#shadow)"/>
+  <text x="812" y="95" text-anchor="middle" font-size="13" font-weight="700" fill="#0d47a1">Google</text>
+  <text x="812" y="112" text-anchor="middle" font-size="13" font-weight="700" fill="#0d47a1">Gemini API</text>
+
+  <!-- Supabase Storage -->
+  <rect x="904" y="65" width="148" height="70" rx="8"
+        fill="#e3f2fd" stroke="#1976d2" stroke-width="2" filter="url(#shadow)"/>
+  <text x="978" y="95" text-anchor="middle" font-size="13" font-weight="700" fill="#0d47a1">Supabase</text>
+  <text x="978" y="112" text-anchor="middle" font-size="13" font-weight="700" fill="#0d47a1">Storage</text>
+
+  <!-- ════════════════════════════════════════════════════
+       INTERNAL SYSTEMS
+       ML Engine  → center (125, 638)
+       PostgreSQL → center (345, 638)
+       Redis      → center (565, 638)
+  ════════════════════════════════════════════════════ -->
+
+  <!-- ML Engine -->
+  <rect x="51" y="608" width="148" height="80" rx="8"
+        fill="#fff9c4" stroke="#f9a825" stroke-width="2" stroke-dasharray="6,3" filter="url(#shadow)"/>
+  <text x="125" y="637" text-anchor="middle" font-size="13" font-weight="700" fill="#e65100">ML Engine</text>
+  <text x="125" y="654" text-anchor="middle" font-size="10" fill="#bf360c">FastAPI (Python)</text>
+  <text x="125" y="670" text-anchor="middle" font-size="10" fill="#bf360c">Port :8000</text>
+
+  <!-- PostgreSQL -->
+  <rect x="271" y="608" width="148" height="80" rx="8"
+        fill="#fff9c4" stroke="#f9a825" stroke-width="2" stroke-dasharray="6,3" filter="url(#shadow)"/>
+  <text x="345" y="637" text-anchor="middle" font-size="13" font-weight="700" fill="#e65100">PostgreSQL</text>
+  <text x="345" y="654" text-anchor="middle" font-size="10" fill="#bf360c">Primary Database</text>
+  <text x="345" y="670" text-anchor="middle" font-size="10" fill="#bf360c">Port :5432</text>
+
+  <!-- Redis -->
+  <rect x="491" y="608" width="148" height="80" rx="8"
+        fill="#fff9c4" stroke="#f9a825" stroke-width="2" stroke-dasharray="6,3" filter="url(#shadow)"/>
+  <text x="565" y="637" text-anchor="middle" font-size="13" font-weight="700" fill="#e65100">Redis</text>
+  <text x="565" y="654" text-anchor="middle" font-size="10" fill="#bf360c">Cache / Session Buffer</text>
+  <text x="565" y="670" text-anchor="middle" font-size="10" fill="#bf360c">Port :6379</text>
+
+
+  <!-- ════════════════════════════════════════════════════
+       ARROWS — ACTORS ↔ MAIN SYSTEM
+
+       Arrow start/end are at node borders (manually computed):
+       · Children right edge  x=178, y=105
+       · Guardian right edge  x=178, y=325
+       · Clinician right edge x=178, y=470
+       · Main ellipse:  use parametric intersection
+         For a point (px,py) approaching from left at angle θ:
+           x = cx + rx·cos(θ),  y = cy + ry·sin(θ)
+         Children→Main:  angle≈atan2(105-310, 178-530) → left-upper quadrant
+  ════════════════════════════════════════════════════ -->
+
+  <!-- ── Children ↔ ReadEase ── -->
+  <!--  → Request (solid gray, offset -8px vertical)   -->
+  <line x1="178" y1="100" x2="380" y2="228"
+        stroke="#546e7a" stroke-width="2" marker-end="url(#m-gray)"/>
+  <!--  ← Response (dashed green, offset +8px vertical) -->
+  <line x1="383" y1="246" x2="178" y2="116"
+        stroke="#388e3c" stroke-width="2" stroke-dasharray="6,4" marker-end="url(#m-green)"/>
+
+  <!-- Label block — sits ABOVE the midpoint of the lines, clear of both -->
+  <rect x="192" y="142" width="158" height="44" rx="4"
+        fill="white" stroke="#e0e0e0" stroke-width="1" opacity="0.95"/>
+  <text x="271" y="158" text-anchor="middle" font-size="9.5" fill="#37474f">→ Mouse events [WebSocket]</text>
+  <text x="271" y="174" text-anchor="middle" font-size="9.5" fill="#2e7d32">← Content + Interventions [Push]</text>
+
+  <!-- ── Guardian ↔ ReadEase ── -->
+  <line x1="178" y1="318" x2="376" y2="299"
+        stroke="#546e7a" stroke-width="2" marker-end="url(#m-gray)"/>
+  <line x1="376" y1="314" x2="178" y2="333"
+        stroke="#388e3c" stroke-width="2" stroke-dasharray="6,4" marker-end="url(#m-green)"/>
+
+  <rect x="192" y="267" width="162" height="44" rx="4"
+        fill="white" stroke="#e0e0e0" stroke-width="1" opacity="0.95"/>
+  <text x="273" y="283" text-anchor="middle" font-size="9.5" fill="#37474f">→ Manage child profile</text>
+  <text x="273" y="299" text-anchor="middle" font-size="9.5" fill="#2e7d32">← Weekly progress report</text>
+
+  <!-- ── Clinician → ReadEase ── -->
+  <line x1="178" y1="463" x2="393" y2="386"
+        stroke="#546e7a" stroke-width="2" marker-end="url(#m-gray)"/>
+
+  <rect x="192" y="404" width="186" height="44" rx="4"
+        fill="white" stroke="#e0e0e0" stroke-width="1" opacity="0.95"/>
+  <text x="285" y="420" text-anchor="middle" font-size="9.5" fill="#37474f">→ Manage reading content</text>
+  <text x="285" y="436" text-anchor="middle" font-size="9.5" fill="#37474f">→ View heatmap &amp; analytics</text>
+
+
+  <!-- ════════════════════════════════════════════════════
+       ARROWS — MAIN SYSTEM ↔ EXTERNAL CLOUD
+
+       Main ellipse right edge toward Gemini (cx=812,cy=100):
+         angle ≈ atan2(100-310, 812-530) = atan2(-210, 282) ≈ -36.6°
+         x = 530 + 155·cos(-36.6°) ≈ 530+124=654
+         y = 310 + 95·sin(-36.6°)  ≈ 310-57=253
+
+       Gemini left edge: x=738, y=100
+       Supabase left edge: x=904, y=100
+  ════════════════════════════════════════════════════ -->
+
+  <!-- ── ReadEase ↔ Gemini ── -->
+  <line x1="651" y1="247" x2="738" y2="105"
+        stroke="#1976d2" stroke-width="2" marker-end="url(#m-blue)"/>
+  <line x1="738" y1="118" x2="655" y2="263"
+        stroke="#7b1fa2" stroke-width="2" stroke-dasharray="6,4" marker-end="url(#m-purple)"/>
+
+  <rect x="646" y="155" width="168" height="44" rx="4"
+        fill="white" stroke="#e0e0e0" stroke-width="1" opacity="0.95"/>
+  <text x="730" y="171" text-anchor="middle" font-size="9.5" fill="#0d47a1">→ Send AI prompt (report data)</text>
+  <text x="730" y="187" text-anchor="middle" font-size="9.5" fill="#6a1b9a">← Markdown report response</text>
+
+  <!-- ── ReadEase ↔ Supabase ── -->
+  <!--
+    Toward Supabase (cx=978, cy=100):
+      angle ≈ atan2(100-310, 978-530)=atan2(-210,448)≈-25.1°
+      x = 530+155·cos(-25.1°)≈530+140=670
+      y = 310+95·sin(-25.1°) ≈310-40=270
+  -->
+  <line x1="676" y1="266" x2="904" y2="118"
+        stroke="#1976d2" stroke-width="2" marker-end="url(#m-blue)"/>
+  <line x1="904" y1="104" x2="677" y2="250"
+        stroke="#7b1fa2" stroke-width="2" stroke-dasharray="6,4" marker-end="url(#m-purple)"/>
+
+  <rect x="746" y="196" width="152" height="44" rx="4"
+        fill="white" stroke="#e0e0e0" stroke-width="1" opacity="0.95"/>
+  <text x="822" y="212" text-anchor="middle" font-size="9.5" fill="#0d47a1">→ Upload media files</text>
+  <text x="822" y="228" text-anchor="middle" font-size="9.5" fill="#6a1b9a">← Retrieve public URLs</text>
+
+
+  <!-- ════════════════════════════════════════════════════
+       ARROWS — MAIN SYSTEM ↔ INTERNAL INFRASTRUCTURE
+
+       Ellipse bottom edge toward ML (cx=125, cy=638):
+         angle ≈ atan2(638-310, 125-530)=atan2(328,-405)≈-39° (3rd quad→toward bottom-left)
+         x = 530+155·cos(219°)≈530-120=410   y = 310+95·sin(219°)≈310+60=370
+       Ellipse → ML: (410,370) → (125, 608)
+       ML top edge y=608, x=125
+
+       Toward PostgreSQL (cx=345, cy=638):
+         angle ≈ atan2(328,-185)≈-60.6°  (but in correct quadrant: down-left)
+         → 180+60.6=240.6°
+         x = 530+155·cos(240.6°)≈530-76=454   y=310+95·sin(240.6°)≈310+83=393
+       Ellipse → PG: (454,393) → (345, 608)
+
+       Toward Redis (cx=565, cy=638):
+         dx=-35, dy=328 → angle≈96°
+         x=530+155·cos(96°)≈530-16=514  y=310+95·sin(96°)≈310+94=404
+  ════════════════════════════════════════════════════ -->
+
+  <!-- ── ReadEase ↔ ML Engine ── -->
+  <line x1="403" y1="371" x2="132" y2="608"
+        stroke="#e65100" stroke-width="2" marker-end="url(#m-orange)"/>
+  <line x1="118" y1="608" x2="397" y2="381"
+        stroke="#388e3c" stroke-width="2" stroke-dasharray="6,4" marker-end="url(#m-green)"/>
+
+  <rect x="178" y="462" width="196" height="57" rx="4"
+        fill="white" stroke="#e0e0e0" stroke-width="1" opacity="0.95"/>
+  <text x="276" y="479" text-anchor="middle" font-size="9.5" fill="#bf360c">→ POST /classify</text>
+  <text x="276" y="494" text-anchor="middle" font-size="9.5" fill="#bf360c">   (kinematic features)</text>
+  <text x="276" y="509" text-anchor="middle" font-size="9.5" fill="#2e7d32">← Cognitive state result</text>
+
+  <!-- ── ReadEase ↔ PostgreSQL ── -->
+  <line x1="455" y1="395" x2="352" y2="608"
+        stroke="#e65100" stroke-width="2" marker-end="url(#m-orange)"/>
+  <line x1="338" y1="608" x2="444" y2="399"
+        stroke="#388e3c" stroke-width="2" stroke-dasharray="6,4" marker-end="url(#m-green)"/>
+
+  <rect x="362" y="480" width="178" height="44" rx="4"
+        fill="white" stroke="#e0e0e0" stroke-width="1" opacity="0.95"/>
+  <text x="451" y="497" text-anchor="middle" font-size="9.5" fill="#bf360c">→ Save sessions / events / users</text>
+  <text x="451" y="513" text-anchor="middle" font-size="9.5" fill="#2e7d32">← Query results</text>
+
+  <!-- ── ReadEase ↔ Redis ── -->
+  <line x1="516" y1="404" x2="557" y2="608"
+        stroke="#e65100" stroke-width="2" marker-end="url(#m-orange)"/>
+  <line x1="573" y1="608" x2="530" y2="407"
+        stroke="#388e3c" stroke-width="2" stroke-dasharray="6,4" marker-end="url(#m-green)"/>
+
+  <rect x="546" y="475" width="158" height="44" rx="4"
+        fill="white" stroke="#e0e0e0" stroke-width="1" opacity="0.95"/>
+  <text x="625" y="492" text-anchor="middle" font-size="9.5" fill="#bf360c">→ Buffer trajectories</text>
+  <text x="625" y="508" text-anchor="middle" font-size="9.5" fill="#2e7d32">← Cached session data</text>
+
+
+  <!-- ════════════════════════════════════════════════════
+       LEGEND
+  ════════════════════════════════════════════════════ -->
+  <rect x="748" y="580" width="350" height="155" rx="10"
+        fill="#fff" stroke="#cfd8dc" stroke-width="1.2" filter="url(#shadow)"/>
+  <text x="923" y="601" text-anchor="middle" font-size="12" font-weight="700" fill="#263238"
+        letter-spacing="0.5">LEGEND</text>
+
+  <!-- Row 1: Actor -->
+  <rect x="768" y="612" width="42" height="20" rx="4"
+        fill="#fff" stroke="#546e7a" stroke-width="2"/>
+  <text x="822" y="626" font-size="10" fill="#455a64">Actor / User Role</text>
+
+  <!-- Row 2: Main System -->
+  <ellipse cx="789" cy="650" rx="21" ry="12"
+           fill="#e8eaf6" stroke="#37474f" stroke-width="2"/>
+  <text x="822" y="654" font-size="10" fill="#455a64">Main System (ReadEase)</text>
+
+  <!-- Row 3: External -->
+  <rect x="768" y="670" width="42" height="20" rx="4"
+        fill="#e3f2fd" stroke="#1976d2" stroke-width="2"/>
+  <text x="822" y="684" font-size="10" fill="#455a64">External Cloud Service</text>
+
+  <!-- Row 4: Internal -->
+  <rect x="768" y="698" width="42" height="20" rx="4"
+        fill="#fff9c4" stroke="#f9a825" stroke-width="2" stroke-dasharray="5,3"/>
+  <text x="822" y="712" font-size="10" fill="#455a64">Internal Infrastructure</text>
+
+  <!-- Row 5: Request -->
+  <line x1="768" y1="727" x2="808" y2="727"
+        stroke="#546e7a" stroke-width="2" marker-end="url(#m-gray)"/>
+  <text x="822" y="731" font-size="10" fill="#455a64">Request (solid arrow)</text>
+
+  <!-- Row 6: Response -->
+  <line x1="768" y1="748" x2="808" y2="748"
+        stroke="#388e3c" stroke-width="2" stroke-dasharray="6,4" marker-end="url(#m-green)"/>
+  <text x="822" y="752" font-size="10" fill="#455a64">Response / Push (dashed)</text>
+
+  <!-- ════════════════════════════════════════════════════
+       FOOTER
+  ════════════════════════════════════════════════════ -->
+  <text x="380" y="750" text-anchor="middle" font-size="10" fill="#b0bec5">
+    ReadEase · System Context Diagram · C4 Model Level 1 · v2.1 · 25/04/2026
+  </text>
+
+</svg>
+</body>
+</html>
