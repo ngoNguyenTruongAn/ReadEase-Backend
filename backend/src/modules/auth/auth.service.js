@@ -357,7 +357,7 @@ class AuthService {
   async getProfile(userId) {
     const user = await this.userRepository.findOne({
       where: { id: userId },
-      select: ['id', 'email', 'role', 'display_name', 'email_verified', 'is_active', 'created_at']
+      select: ['id', 'email', 'role', 'display_name', 'email_verified', 'is_active', 'created_at'],
     });
 
     if (!user) {
