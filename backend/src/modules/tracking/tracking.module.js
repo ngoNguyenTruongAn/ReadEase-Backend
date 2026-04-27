@@ -10,13 +10,19 @@ const ReplayStorageService = require('./services/replay-storage.service');
 const SessionService = require('./services/session.service');
 const MlClientService = require('./services/ml-client.service');
 const { GamificationModule } = require('../gamification/gamification.module');
+const { LexicalModule } = require('../lexical/lexical.module');
 
 const { SessionReplayEventEntity } = require('./entities/session-replay-event.entity');
 
 class TrackingModule {}
 
 Module({
-  imports: [TypeOrmModule.forFeature([SessionReplayEventEntity]), HttpModule, GamificationModule],
+  imports: [
+    TypeOrmModule.forFeature([SessionReplayEventEntity]),
+    HttpModule,
+    GamificationModule,
+    LexicalModule,    // provides LexicalService for WS gateway semantic intervention
+  ],
   controllers: [TrackingController],
   providers: [
     TrackingGateway,
@@ -28,3 +34,4 @@ Module({
 })(TrackingModule);
 
 module.exports = { TrackingModule };
+
