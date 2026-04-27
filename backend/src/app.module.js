@@ -30,6 +30,7 @@ const { StorageModule } = require('./modules/storage/storage.module');
 const { AnalyticsModule } = require('./modules/analytics/analytics.module');
 const { GamificationModule } = require('./modules/gamification/gamification.module');
 const { GuardianModule } = require('./modules/guardian/guardian.module');
+const { ReportsModule } = require('./modules/reports/reports.module');
 
 const entities = [
   UserEntity,
@@ -77,6 +78,7 @@ const metadata = {
     AnalyticsModule,
     GamificationModule,
     GuardianModule,
+    ReportsModule,
     ThrottlerModule.forRoot([
       {
         ttl: 60000,
