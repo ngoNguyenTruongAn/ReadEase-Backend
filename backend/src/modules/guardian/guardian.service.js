@@ -260,16 +260,6 @@ class GuardianService {
       [childId],
     );
 
-    const otpCodes = await this.dataSource.query(
-      `
-      SELECT id, user_id, code, type, used, expires_at, created_at
-      FROM otp_codes
-      WHERE user_id = $1
-      ORDER BY created_at DESC
-      `,
-      [childId],
-    );
-
     logger.info('Guardian exported child data', {
       context: 'GuardianService',
       data: { guardianId, childId },
@@ -288,7 +278,6 @@ class GuardianService {
       tokens,
       redemptions,
       reports,
-      otpCodes,
     };
   }
 
@@ -396,16 +385,6 @@ class GuardianService {
       [childId],
     );
 
-    const otp_codes = await this.getCount(
-      executor,
-      `
-      SELECT COUNT(*)::int AS count
-      FROM otp_codes
-      WHERE user_id = $1
-      `,
-      [childId],
-    );
-
     return {
       users,
       children_profiles,
@@ -416,7 +395,6 @@ class GuardianService {
       tokens,
       redemptions,
       reports,
-      otp_codes,
     };
   }
 
@@ -439,14 +417,6 @@ class GuardianService {
       await this.verifyGuardianship(queryRunner.manager, guardianId, childId);
 
       const deletedCounts = await this.collectChildDataCounts(queryRunner.manager, childId);
-
-      await queryRunner.manager.query(
-        `
-        DELETE FROM otp_codes
-        WHERE user_id = $1
-        `,
-        [childId],
-      );
 
       await queryRunner.manager.query(
         `

@@ -72,16 +72,14 @@ describe('GuardianService', () => {
       .mockResolvedValueOnce([{ id: 2, session_id: 'session-1' }])
       .mockResolvedValueOnce([{ id: 'token-1', child_id: childId }])
       .mockResolvedValueOnce([{ id: 'redeem-1', child_id: childId }])
-      .mockResolvedValueOnce([{ id: 'report-1', child_id: childId }])
-      .mockResolvedValueOnce([{ id: 'otp-1', user_id: childId, code: '123456' }]);
+      .mockResolvedValueOnce([{ id: 'report-1', child_id: childId }]);
 
     const result = await service.exportChildData(guardianId, childId, 'CONFIRM_EXPORT_CHILD_DATA');
 
     expect(result.childId).toBe(childId);
     expect(result.exportedByGuardianId).toBe(guardianId);
-    expect(result.otpCodes).toEqual([{ id: 'otp-1', user_id: childId, code: '123456' }]);
     expect(result.child.password_hash).toBeUndefined();
-    expect(dataSource.query).toHaveBeenCalledTimes(10);
+    expect(dataSource.query).toHaveBeenCalledTimes(9);
   });
 
   it('should throw ForbiddenException when guardian has no relationship with child for export', async () => {
@@ -110,7 +108,6 @@ describe('GuardianService', () => {
       tokens: 3,
       redemptions: 2,
       reports: 1,
-      otp_codes: 1,
     };
 
     queryRunner.manager.query.mockImplementation(async (sql) => {
@@ -150,14 +147,7 @@ describe('GuardianService', () => {
       if (normalized.includes('select count(*)::int as count from reports')) {
         return [{ count: state.reports }];
       }
-      if (normalized.includes('select count(*)::int as count from otp_codes')) {
-        return [{ count: state.otp_codes }];
-      }
 
-      if (normalized.startsWith('delete from otp_codes')) {
-        state.otp_codes = 0;
-        return [];
-      }
       if (normalized.startsWith('delete from reading_sessions')) {
         state.reading_sessions = 0;
         state.mouse_events = 0;
@@ -206,7 +196,6 @@ describe('GuardianService', () => {
       tokens: 3,
       redemptions: 2,
       reports: 1,
-      otp_codes: 1,
     });
 
     expect(state).toEqual({
@@ -219,7 +208,6 @@ describe('GuardianService', () => {
       tokens: 0,
       redemptions: 0,
       reports: 0,
-      otp_codes: 0,
     });
     expect(queryRunner.commitTransaction).toHaveBeenCalled();
     expect(queryRunner.rollbackTransaction).not.toHaveBeenCalled();
