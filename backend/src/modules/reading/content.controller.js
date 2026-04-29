@@ -24,6 +24,12 @@ const { JwtAuthGuard } = require('../auth/guards/jwt-auth.guard');
 const { RolesGuard } = require('../auth/guards/roles.guard');
 const { Roles } = require('../auth/decorators/roles.decorator');
 
+// Standard UUID format validation (8-4-4-4-12 hex chars)
+const UUID_REGEX = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
+function assertUuid(id, field = 'id') {
+  if (!UUID_REGEX.test(id)) throw new BadRequestException(`${field} must be a valid UUID`);
+}
+
 class ContentController {
   constructor(contentService) {
     this.contentService = contentService;
@@ -53,10 +59,12 @@ class ContentController {
   }
 
   async getContentById(id) {
+    assertUuid(id, 'id');
     return this.contentService.getContentById(id);
   }
 
   async updateContent(id, body) {
+    assertUuid(id, 'id');
     const { error, value } = UpdateContentDto.schema.validate(body);
 
     if (error) {
@@ -70,6 +78,7 @@ class ContentController {
   }
 
   async deleteContent(id) {
+    assertUuid(id, 'id');
     return this.contentService.deleteContent(id);
   }
 }

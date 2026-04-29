@@ -72,7 +72,7 @@ const getChildSessionsDescriptor = Object.getOwnPropertyDescriptor(
 );
 
 Reflect.decorate(
-  [Get(':childId'), UseGuards(JwtAuthGuard, RolesGuard), Roles('ROLE_CLINICIAN')],
+  [Get(':childId'), UseGuards(JwtAuthGuard, RolesGuard), Roles('ROLE_CLINICIAN', 'ROLE_GUARDIAN')],
   SessionsController.prototype,
   'getChildSessions',
   getChildSessionsDescriptor,

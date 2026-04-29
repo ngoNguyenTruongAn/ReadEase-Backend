@@ -18,6 +18,7 @@ const ReplayStorageService = require('./services/replay-storage.service');
 const MlClientService = require('./services/ml-client.service');
 const { routeIntervention } = require('./utils/intervention-router');
 const { TokenService } = require('../gamification/gamification.service');
+const { LexicalService } = require('../lexical/lexical.service');
 
 class TrackingGateway {
   constructor(
@@ -27,6 +28,7 @@ class TrackingGateway {
     mlClientService,
     dataSource,
     tokenService,
+    lexicalService,
   ) {
     this.trajectoryBuffer = trajectoryBufferService;
     this.sessionService = sessionService;
@@ -34,6 +36,7 @@ class TrackingGateway {
     this.mlClient = mlClientService;
     this.dataSource = dataSource;
     this.tokenService = tokenService;
+    this.lexicalService = lexicalService;
   }
 
   handleConnection(client, request) {
@@ -143,12 +146,45 @@ class TrackingGateway {
   /**
    * ML Classification pipeline:
    * 1. Extract features + call ML Engine
-   * 2. Route intervention to client via WebSocket
-   * 3. Store cognitive state in session_replay_events
+   * 2. On REGRESSION: call LexicalService to get simplified word for tooltip
+   * 3. Route intervention to client via WebSocket
+   * 4. Store cognitive state in session_replay_events
    */
   async classifyAndRoute(client, points) {
     const mlResult = await this.mlClient.classify(client.session_id, points);
     const lastPoint = points.length ? points[points.length - 1] : null;
+
+    // ── Semantic enrichment for REGRESSION ──────────────────────────────────
+    // When the ML engine detects a REGRESSION (child is re-reading a word),
+    // fetch a simplified explanation to display in the tooltip overlay.
+    if (mlResult.state === 'REGRESSION' && this.lexicalService) {
+      const word = lastPoint?.word || lastPoint?.currentWord || null;
+      const contextSentence = lastPoint?.sentence || '';
+
+      if (word) {
+        try {
+          const lexResult = await this.lexicalService.simplifyWord(word, contextSentence);
+          mlResult.original = lexResult.original;
+          mlResult.simplified = lexResult.simplified;
+
+          logger.info('Lexical simplification attached to REGRESSION event', {
+            context: 'TrackingGateway',
+            data: {
+              sessionId: client.session_id,
+              word,
+              simplified: lexResult.simplified,
+              source: lexResult.source,
+            },
+          });
+        } catch (lexErr) {
+          // Non-fatal — tooltip will show without simplified text
+          logger.warn('LexicalService failed (non-fatal), sending tooltip without simplification', {
+            context: 'TrackingGateway',
+            data: { error: lexErr.message, word },
+          });
+        }
+      }
+    }
 
     // Route intervention to client
     const interventionType = routeIntervention(client, mlResult, lastPoint);
@@ -363,6 +399,7 @@ Inject(ReplayStorageService)(TrackingGateway, undefined, 2);
 Inject(MlClientService)(TrackingGateway, undefined, 3);
 Inject(DataSource)(TrackingGateway, undefined, 4);
 Inject(TokenService)(TrackingGateway, undefined, 5);
+Inject(LexicalService)(TrackingGateway, undefined, 6);
 
 Reflect.decorate([WebSocketGateway({ path: '/tracking', cors: true })], TrackingGateway);
 

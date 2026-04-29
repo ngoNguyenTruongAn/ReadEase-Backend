@@ -12,6 +12,11 @@ describe('ContentController', () => {
   let controller;
   let service;
 
+  // Valid UUIDs for test cases
+  const CONTENT_ID_1 = '00000000-0000-0000-0000-000000000001';
+  const CONTENT_ID_2 = '00000000-0000-0000-0000-000000000002';
+  const CONTENT_ID_3 = '00000000-0000-0000-0000-000000000003';
+
   beforeEach(() => {
     service = {
       getContent: jest.fn(),
@@ -42,7 +47,7 @@ describe('ContentController', () => {
 
   it('POST /content should create content for clinician request user', async () => {
     service.createContent.mockResolvedValue({
-      id: 'content-1',
+      id: CONTENT_ID_1,
       title: 'Story',
       body: 'This body is intentionally long enough to satisfy validation minimum length rules.',
       difficulty: 'EASY',
@@ -65,13 +70,13 @@ describe('ContentController', () => {
       expect.objectContaining({ title: 'Story' }),
       req.user,
     );
-    expect(result.data.id).toBe('content-1');
+    expect(result.data.id).toBe(CONTENT_ID_1);
     expect(result.message).toBe('Created reading content successfully');
   });
 
   it('GET /content/:id should return full content detail', async () => {
     service.getContentById.mockResolvedValue({
-      id: 'content-9',
+      id: CONTENT_ID_1,
       title: 'Story detail',
       body: 'con bò ăn cỏ',
       body_segmented: 'con_bò ăn cỏ',
@@ -80,16 +85,16 @@ describe('ContentController', () => {
       word_count: 3,
     });
 
-    const result = await controller.getContentById('content-9');
+    const result = await controller.getContentById(CONTENT_ID_1);
 
-    expect(service.getContentById).toHaveBeenCalledWith('content-9');
+    expect(service.getContentById).toHaveBeenCalledWith(CONTENT_ID_1);
     expect(result.body).toBe('con bò ăn cỏ');
     expect(result.body_segmented).toBe('con_bò ăn cỏ');
   });
 
   it('PUT /content/:id should update content', async () => {
     service.updateContent.mockResolvedValue({
-      id: 'content-2',
+      id: CONTENT_ID_2,
       title: 'Updated',
       body: 'This updated body is long enough to meet validation and test update flow correctly.',
       difficulty: 'MEDIUM',
@@ -98,12 +103,12 @@ describe('ContentController', () => {
       created_at: new Date('2026-03-15T00:00:00.000Z'),
     });
 
-    const result = await controller.updateContent('content-2', {
+    const result = await controller.updateContent(CONTENT_ID_2, {
       title: 'Updated',
       body: 'This updated body is long enough to meet validation and test update flow correctly.',
     });
 
-    expect(service.updateContent).toHaveBeenCalledWith('content-2', {
+    expect(service.updateContent).toHaveBeenCalledWith(CONTENT_ID_2, {
       title: 'Updated',
       body: 'This updated body is long enough to meet validation and test update flow correctly.',
     });
@@ -114,9 +119,9 @@ describe('ContentController', () => {
   it('DELETE /content/:id should soft delete content', async () => {
     service.deleteContent.mockResolvedValue({ message: 'Content deleted' });
 
-    const result = await controller.deleteContent('content-3');
+    const result = await controller.deleteContent(CONTENT_ID_3);
 
-    expect(service.deleteContent).toHaveBeenCalledWith('content-3');
+    expect(service.deleteContent).toHaveBeenCalledWith(CONTENT_ID_3);
     expect(result).toEqual({ message: 'Content deleted' });
   });
 
@@ -138,7 +143,7 @@ describe('ContentController', () => {
     service.updateContent.mockRejectedValue(new NotFoundException('Content not found'));
 
     await expect(
-      controller.updateContent('missing-id', {
+      controller.updateContent(CONTENT_ID_2, {
         title: 'Updated',
       }),
     ).rejects.toThrow(NotFoundException);

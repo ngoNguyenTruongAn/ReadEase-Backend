@@ -103,14 +103,16 @@ class GeminiService {
       };
     } catch (error) {
       // Detect quota-exceeded (429) errors specifically for clearer monitoring
-      const isQuotaError =
-        error.message?.includes('429') || error.message?.includes('quota');
+      const isQuotaError = error.message?.includes('429') || error.message?.includes('quota');
 
       if (isQuotaError) {
-        logger.warn('Gemini API quota exceeded (429) — using fallback report. Check your plan and billing at https://ai.google.dev/gemini-api/docs/rate-limits', {
-          context: 'GeminiService',
-          data: { model: this.modelName, error: error.message },
-        });
+        logger.warn(
+          'Gemini API quota exceeded (429) — using fallback report. Check your plan and billing at https://ai.google.dev/gemini-api/docs/rate-limits',
+          {
+            context: 'GeminiService',
+            data: { model: this.modelName, error: error.message },
+          },
+        );
       } else {
         logger.error('Gemini API call failed, falling back to local report', {
           context: 'GeminiService',
