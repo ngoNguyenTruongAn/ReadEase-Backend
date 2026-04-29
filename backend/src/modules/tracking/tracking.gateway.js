@@ -151,20 +151,20 @@ class TrackingGateway {
    * 4. Store cognitive state in session_replay_events
    */
   async classifyAndRoute(client, points) {
-    const mlResult  = await this.mlClient.classify(client.session_id, points);
+    const mlResult = await this.mlClient.classify(client.session_id, points);
     const lastPoint = points.length ? points[points.length - 1] : null;
 
     // ── Semantic enrichment for REGRESSION ──────────────────────────────────
     // When the ML engine detects a REGRESSION (child is re-reading a word),
     // fetch a simplified explanation to display in the tooltip overlay.
     if (mlResult.state === 'REGRESSION' && this.lexicalService) {
-      const word            = lastPoint?.word || lastPoint?.currentWord || null;
+      const word = lastPoint?.word || lastPoint?.currentWord || null;
       const contextSentence = lastPoint?.sentence || '';
 
       if (word) {
         try {
           const lexResult = await this.lexicalService.simplifyWord(word, contextSentence);
-          mlResult.original   = lexResult.original;
+          mlResult.original = lexResult.original;
           mlResult.simplified = lexResult.simplified;
 
           logger.info('Lexical simplification attached to REGRESSION event', {

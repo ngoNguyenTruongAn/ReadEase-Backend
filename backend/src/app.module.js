@@ -80,7 +80,7 @@ const metadata = {
     GamificationModule,
     GuardianModule,
     ReportsModule,
-    LexicalModule,   // [S3-T02] Gemini word simplification for semantic intervention
+    LexicalModule, // [S3-T02] Gemini word simplification for semantic intervention
     ThrottlerModule.forRoot([
       {
         ttl: 60000,

@@ -70,9 +70,9 @@ describe('SessionsController', () => {
     expect(roles).toEqual(['ROLE_CLINICIAN']);
   });
 
-  it('should have ROLE_CLINICIAN guard on getChildSessions', () => {
+  it('should have ROLE_CLINICIAN and ROLE_GUARDIAN guard on getChildSessions', () => {
     const roles = Reflect.getMetadata('roles', SessionsController.prototype.getChildSessions);
-    expect(roles).toEqual(['ROLE_CLINICIAN']);
+    expect(roles).toEqual(['ROLE_CLINICIAN', 'ROLE_GUARDIAN']);
   });
 
   // ── Validation ──

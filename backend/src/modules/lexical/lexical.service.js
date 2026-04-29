@@ -21,7 +21,7 @@ const { GoogleGenerativeAI } = require('@google/generative-ai');
 const { logger } = require('../../common/logger/winston.config');
 
 const CACHE_TTL_SECONDS = parseInt(process.env.LEXICAL_CACHE_TTL_SECONDS || '86400', 10); // 24h
-const GEMINI_TIMEOUT_MS = parseInt(process.env.LEXICAL_GEMINI_TIMEOUT_MS || '5000', 10);  // 5s
+const GEMINI_TIMEOUT_MS = parseInt(process.env.LEXICAL_GEMINI_TIMEOUT_MS || '5000', 10); // 5s
 
 class LexicalService {
   /**
@@ -29,10 +29,10 @@ class LexicalService {
    * @param {import('@nestjs/config').ConfigService} configService
    */
   constructor(redisClient, configService) {
-    this.redis       = redisClient;
+    this.redis = redisClient;
     this.configService = configService;
     this.geminiClient = null;
-    this.modelName    = '';
+    this.modelName = '';
 
     this._initGemini();
   }
@@ -82,7 +82,7 @@ class LexicalService {
     }
 
     const normalised = word.trim();
-    const key        = this._cacheKey(normalised);
+    const key = this._cacheKey(normalised);
 
     // ── 1. Redis cache lookup ──
     try {
@@ -106,13 +106,16 @@ class LexicalService {
     // ── 2. Gemini API call ──
     if (this.geminiClient) {
       try {
-        const prompt  = this._buildPrompt(normalised, contextSentence);
-        const model   = this.geminiClient.getGenerativeModel({ model: this.modelName });
+        const prompt = this._buildPrompt(normalised, contextSentence);
+        const model = this.geminiClient.getGenerativeModel({ model: this.modelName });
 
         const result = await Promise.race([
           model.generateContent(prompt),
           new Promise((_, reject) =>
-            setTimeout(() => reject(new Error('LexicalService: Gemini timeout')), GEMINI_TIMEOUT_MS),
+            setTimeout(
+              () => reject(new Error('LexicalService: Gemini timeout')),
+              GEMINI_TIMEOUT_MS,
+            ),
           ),
         ]);
 
@@ -139,8 +142,7 @@ class LexicalService {
 
         return { original: normalised, simplified, source: 'gemini' };
       } catch (geminiErr) {
-        const isQuota =
-          geminiErr.message?.includes('429') || geminiErr.message?.includes('quota');
+        const isQuota = geminiErr.message?.includes('429') || geminiErr.message?.includes('quota');
 
         if (isQuota) {
           logger.warn('LexicalService: Gemini quota exceeded — using fallback', {
@@ -195,9 +197,9 @@ Explanation:`.trim();
     });
     // Return the original word — FE tooltip will display it as-is
     return {
-      original:   word || '',
+      original: word || '',
       simplified: word || '',
-      source:     'fallback',
+      source: 'fallback',
     };
   }
 }

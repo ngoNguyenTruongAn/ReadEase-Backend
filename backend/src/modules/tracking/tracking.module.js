@@ -21,7 +21,7 @@ Module({
     TypeOrmModule.forFeature([SessionReplayEventEntity]),
     HttpModule,
     GamificationModule,
-    LexicalModule,    // provides LexicalService for WS gateway semantic intervention
+    LexicalModule, // provides LexicalService for WS gateway semantic intervention
   ],
   controllers: [TrackingController],
   providers: [
@@ -34,4 +34,3 @@ Module({
 })(TrackingModule);
 
 module.exports = { TrackingModule };
-

@@ -23,7 +23,7 @@ const {
 } = require('@nestjs/common');
 
 const { LexicalService } = require('./lexical.service');
-const { JwtAuthGuard }   = require('../auth/guards/jwt-auth.guard');
+const { JwtAuthGuard } = require('../auth/guards/jwt-auth.guard');
 
 class LexicalController {
   /**
@@ -50,7 +50,7 @@ class LexicalController {
    *   }
    */
   async simplify(body) {
-    const word            = body?.word?.toString().trim();
+    const word = body?.word?.toString().trim();
     const contextSentence = body?.contextSentence?.toString().trim() || '';
 
     if (!word) {
@@ -64,7 +64,7 @@ class LexicalController {
 
     return {
       message: 'Word simplified successfully',
-      data:    result,
+      data: result,
     };
   }
 }
@@ -74,10 +74,7 @@ class LexicalController {
 Controller('api/v1/lexical')(LexicalController);
 Inject(LexicalService)(LexicalController, undefined, 0);
 
-const simplifyDescriptor = Object.getOwnPropertyDescriptor(
-  LexicalController.prototype,
-  'simplify',
-);
+const simplifyDescriptor = Object.getOwnPropertyDescriptor(LexicalController.prototype, 'simplify');
 
 Reflect.decorate(
   [Post('simplify'), UseGuards(JwtAuthGuard)],

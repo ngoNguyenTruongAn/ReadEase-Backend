@@ -118,7 +118,10 @@ class OtpService {
 
     // 2. Check whether account is already locked
     const lockTtlRemaining = await this.redis.ttl(this._attemptsKey(userId, type));
-    const currentAttempts = parseInt((await this.redis.get(this._attemptsKey(userId, type))) || '0', 10);
+    const currentAttempts = parseInt(
+      (await this.redis.get(this._attemptsKey(userId, type))) || '0',
+      10,
+    );
 
     if (currentAttempts >= this.maxAttempts) {
       throw new HttpException(

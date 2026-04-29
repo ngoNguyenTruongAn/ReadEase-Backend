@@ -11,9 +11,9 @@
  */
 
 const { Module } = require('@nestjs/common');
-const Redis      = require('ioredis');
+const Redis = require('ioredis');
 
-const { LexicalService }    = require('./lexical.service');
+const { LexicalService } = require('./lexical.service');
 const { LexicalController } = require('./lexical.controller');
 
 class LexicalModule {}
@@ -27,9 +27,9 @@ Module({
       provide: 'REDIS_LEXICAL_CLIENT',
       useFactory: () =>
         new Redis({
-          host:          process.env.REDIS_HOST  || 'localhost',
-          port:          parseInt(process.env.REDIS_PORT || '6379', 10),
-          lazyConnect:   false,
+          host: process.env.REDIS_HOST || 'localhost',
+          port: parseInt(process.env.REDIS_PORT || '6379', 10),
+          lazyConnect: false,
           retryStrategy: (times) => Math.min(times * 100, 3000),
         }),
     },

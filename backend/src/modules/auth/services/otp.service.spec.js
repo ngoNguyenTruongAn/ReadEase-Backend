@@ -78,12 +78,7 @@ describe('OtpService (Redis)', () => {
       expect(code).toMatch(/^\d{6}$/);
 
       // OTP stored with TTL
-      expect(mockRedis.set).toHaveBeenCalledWith(
-        `otp:${USER_ID}:${TYPE}`,
-        code,
-        'EX',
-        service.ttl,
-      );
+      expect(mockRedis.set).toHaveBeenCalledWith(`otp:${USER_ID}:${TYPE}`, code, 'EX', service.ttl);
 
       // Attempt counter cleared
       expect(mockRedis.del).toHaveBeenCalledWith(`otp:attempts:${USER_ID}:${TYPE}`);
@@ -132,7 +127,7 @@ describe('OtpService (Redis)', () => {
     it('should return true and delete keys when code is correct', async () => {
       mockRedis.get
         .mockResolvedValueOnce(VALID_CODE) // _otpKey → stored code
-        .mockResolvedValueOnce('0');         // _attemptsKey → 0 attempts so far
+        .mockResolvedValueOnce('0'); // _attemptsKey → 0 attempts so far
 
       mockRedis.ttl.mockResolvedValue(-2); // no active lock
 
@@ -173,7 +168,7 @@ describe('OtpService (Redis)', () => {
     it('should throw 400 with remaining-attempts message on first wrong attempt', async () => {
       mockRedis.get
         .mockResolvedValueOnce(VALID_CODE) // stored code
-        .mockResolvedValueOnce('0');         // current attempts = 0
+        .mockResolvedValueOnce('0'); // current attempts = 0
 
       mockRedis.ttl.mockResolvedValue(-2); // not locked yet
       mockRedis.incr.mockResolvedValue(1); // attempts becomes 1
@@ -194,10 +189,10 @@ describe('OtpService (Redis)', () => {
       // and trigger the 429 path inside the wrong-code branch
       mockRedis.get
         .mockResolvedValueOnce(VALID_CODE) // stored OTP
-        .mockResolvedValueOnce('4');        // current attempts = 4 (below threshold)
+        .mockResolvedValueOnce('4'); // current attempts = 4 (below threshold)
 
-      mockRedis.ttl.mockResolvedValue(-2);  // not locked yet (4 < 5)
-      mockRedis.incr.mockResolvedValue(5);  // after incr → 5, triggers lock path
+      mockRedis.ttl.mockResolvedValue(-2); // not locked yet (4 < 5)
+      mockRedis.incr.mockResolvedValue(5); // after incr → 5, triggers lock path
 
       await expect(service.verifyOTP(USER_ID, 'WRONG5', TYPE)).rejects.toMatchObject({
         status: HttpStatus.TOO_MANY_REQUESTS,
@@ -205,9 +200,7 @@ describe('OtpService (Redis)', () => {
     });
 
     it('should throw 429 immediately when account is already locked', async () => {
-      mockRedis.get
-        .mockResolvedValueOnce(VALID_CODE)
-        .mockResolvedValueOnce('5'); // already at max
+      mockRedis.get.mockResolvedValueOnce(VALID_CODE).mockResolvedValueOnce('5'); // already at max
 
       mockRedis.ttl.mockResolvedValue(800);
 

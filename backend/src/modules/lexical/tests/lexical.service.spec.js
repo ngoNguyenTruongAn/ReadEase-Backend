@@ -23,8 +23,8 @@ const { LexicalService } = require('../lexical.service');
 
 function makeRedisMock(overrides = {}) {
   return {
-    get:    jest.fn().mockResolvedValue(null),
-    set:    jest.fn().mockResolvedValue('OK'),
+    get: jest.fn().mockResolvedValue(null),
+    set: jest.fn().mockResolvedValue('OK'),
     ...overrides,
   };
 }
@@ -33,7 +33,7 @@ function makeConfigMock(apiKey = 'fake-api-key') {
   return {
     get: jest.fn((key) => {
       if (key === 'gemini.apiKey') return apiKey;
-      if (key === 'gemini.model')  return 'gemini-2.0-flash';
+      if (key === 'gemini.model') return 'gemini-2.0-flash';
       return null;
     }),
   };
@@ -66,12 +66,12 @@ function buildService(redisMock, configMock, geminiClientOverride) {
 describe('LexicalService', () => {
   // ── Test 1: Cache hit ────────────────────────────────────────────────────
   it('should return cached result without calling Gemini', async () => {
-    const redisMock  = makeRedisMock({
+    const redisMock = makeRedisMock({
       get: jest.fn().mockResolvedValue(JSON.stringify({ simplified: 'Đây là từ được lưu.' })),
     });
     const configMock = makeConfigMock();
     const geminiMock = makeGeminiMock();
-    const svc        = buildService(redisMock, configMock, geminiMock);
+    const svc = buildService(redisMock, configMock, geminiMock);
 
     const result = await svc.simplifyWord('caterpillar', 'The caterpillar crawled.');
 
@@ -84,10 +84,10 @@ describe('LexicalService', () => {
 
   // ── Test 2: Cache miss + Gemini success ───────────────────────────────────
   it('should call Gemini on cache miss and store result in cache', async () => {
-    const redisMock  = makeRedisMock();
+    const redisMock = makeRedisMock();
     const configMock = makeConfigMock();
     const geminiMock = makeGeminiMock('Con sâu là sinh vật nhỏ bé sống trong vườn.');
-    const svc        = buildService(redisMock, configMock, geminiMock);
+    const svc = buildService(redisMock, configMock, geminiMock);
 
     const result = await svc.simplifyWord('caterpillar', '');
 
@@ -109,7 +109,7 @@ describe('LexicalService', () => {
 
   // ── Test 3: Cache miss + Gemini failure → fallback ────────────────────────
   it('should return fallback when Gemini throws an error', async () => {
-    const redisMock  = makeRedisMock();
+    const redisMock = makeRedisMock();
     const configMock = makeConfigMock();
     const failingGemini = {
       getGenerativeModel: jest.fn().mockReturnValue({
@@ -127,9 +127,9 @@ describe('LexicalService', () => {
 
   // ── Test 4: No Gemini client (no API key) → fallback ────────────────────
   it('should return fallback immediately when Gemini client is not configured', async () => {
-    const redisMock  = makeRedisMock();
+    const redisMock = makeRedisMock();
     const configMock = makeConfigMock(null); // no API key
-    const svc        = buildService(redisMock, configMock, null);
+    const svc = buildService(redisMock, configMock, null);
 
     const result = await svc.simplifyWord('luminous', 'The luminous moon...');
 
@@ -139,9 +139,9 @@ describe('LexicalService', () => {
 
   // ── Test 5: Empty word ────────────────────────────────────────────────────
   it('should return fallback for empty word without calling Redis', async () => {
-    const redisMock  = makeRedisMock();
+    const redisMock = makeRedisMock();
     const configMock = makeConfigMock();
-    const svc        = buildService(redisMock, configMock, makeGeminiMock());
+    const svc = buildService(redisMock, configMock, makeGeminiMock());
 
     const result = await svc.simplifyWord('');
 
@@ -156,7 +156,7 @@ describe('LexicalService', () => {
     });
     const configMock = makeConfigMock();
     const geminiMock = makeGeminiMock('Đây là ánh sáng rực rỡ.');
-    const svc        = buildService(redisMock, configMock, geminiMock);
+    const svc = buildService(redisMock, configMock, geminiMock);
 
     const result = await svc.simplifyWord('radiant');
 
@@ -171,7 +171,7 @@ describe('LexicalService', () => {
     });
     const configMock = makeConfigMock();
     const geminiMock = makeGeminiMock('Đây là loài chim bay trên trời.');
-    const svc        = buildService(redisMock, configMock, geminiMock);
+    const svc = buildService(redisMock, configMock, geminiMock);
 
     const result = await svc.simplifyWord('pelican', 'A pelican soared.');
 
@@ -181,25 +181,20 @@ describe('LexicalService', () => {
 
   // ── Test 8: Response format validation ───────────────────────────────────
   it('should normalise word (trim + lowercase) for cache key', async () => {
-    const redisMock  = makeRedisMock();
+    const redisMock = makeRedisMock();
     const configMock = makeConfigMock();
     const geminiMock = makeGeminiMock('Đây là từ đơn giản.');
-    const svc        = buildService(redisMock, configMock, geminiMock);
+    const svc = buildService(redisMock, configMock, geminiMock);
 
     await svc.simplifyWord('  HELLO  ');
 
     expect(redisMock.get).toHaveBeenCalledWith('lexical:hello');
-    expect(redisMock.set).toHaveBeenCalledWith(
-      'lexical:hello',
-      expect.any(String),
-      'EX',
-      86400,
-    );
+    expect(redisMock.set).toHaveBeenCalledWith('lexical:hello', expect.any(String), 'EX', 86400);
   });
 
   // ── Test 9: Gemini quota error (429) → fallback ───────────────────────────
   it('should return fallback when Gemini returns 429 quota error', async () => {
-    const redisMock  = makeRedisMock();
+    const redisMock = makeRedisMock();
     const configMock = makeConfigMock();
     const quotaGemini = {
       getGenerativeModel: jest.fn().mockReturnValue({
