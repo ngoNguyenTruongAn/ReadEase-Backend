@@ -1,13 +1,13 @@
 /**
  * Reports Service
  *
- * Aggregates reading session data for a given child and week,
- * calls GeminiService to generate a Markdown report,
- * and persists the result into the reports table.
+ * Aggregates reading session data — including cognitive state classifications
+ * and motor behaviour metrics — for a given child and week, calls GeminiService
+ * to generate a Dyslexia-aware Markdown report, and persists the result.
  */
 
 const { Injectable, NotFoundException, ConflictException } = require('@nestjs/common');
-const { InjectRepository } = require('@nestjs/typeorm');
+const { InjectRepository, InjectDataSource } = require('@nestjs/typeorm');
 const { Between } = require('typeorm');
 
 const { ReportEntity } = require('./entities/report.entity');
@@ -24,12 +24,14 @@ class ReportsService {
     contentRepository,
     userRepository,
     geminiService,
+    dataSource,
   ) {
     this.reportRepository = reportRepository;
     this.sessionRepository = sessionRepository;
     this.contentRepository = contentRepository;
     this.userRepository = userRepository;
     this.geminiService = geminiService;
+    this.dataSource = dataSource;
   }
 
   // ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
@@ -70,7 +72,7 @@ class ReportsService {
       );
     }
 
-    // ── 3. Data aggregation ──
+    // ── 3. Data aggregation (sessions + cognitive + motor) ──
     const aggregatedData = await this._aggregateSessionData(childId, child, weekStart, weekEnd);
 
     logger.info('Reading data aggregated for report', {
@@ -80,6 +82,11 @@ class ReportsService {
         totalSessions: aggregatedData.totalSessions,
         totalMinutes: aggregatedData.totalReadingMinutes,
         booksCount: aggregatedData.booksRead.length,
+        cognitiveEvents:
+          aggregatedData.cognitiveBreakdown.FLUENT +
+          aggregatedData.cognitiveBreakdown.REGRESSION +
+          aggregatedData.cognitiveBreakdown.DISTRACTION,
+        motorEvents: aggregatedData.motorMetrics.totalEvents,
       },
     });
 
@@ -149,8 +156,8 @@ class ReportsService {
   // ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
 
   /**
-   * Query ReadingSession + ReadingContent to build the aggregated
-   * statistics that the Gemini prompt requires.
+   * Query ReadingSession + ReadingContent + SessionReplayEvents + MouseEvents
+   * to build comprehensive aggregated statistics for the Gemini prompt.
    */
   async _aggregateSessionData(childId, child, weekStart, weekEnd) {
     // Fetch all sessions for this child within the date range
@@ -168,8 +175,11 @@ class ReportsService {
     let effortSum = 0;
     let completedCount = 0;
     const booksMap = new Map(); // Deduplicate books by content_id
+    const sessionIds = [];
 
     for (const session of sessions) {
+      sessionIds.push(session.id);
+
       // Calculate reading duration
       if (session.ended_at && session.started_at) {
         const durationMs =
@@ -204,6 +214,12 @@ class ReportsService {
     const averageWordsPerMinute =
       totalReadingMinutes > 0 ? Math.round(totalWords / totalReadingMinutes) : 0;
 
+    // ── Cognitive state breakdown from session_replay_events ──
+    const cognitiveBreakdown = await this._getCognitiveBreakdown(sessionIds);
+
+    // ── Motor behaviour metrics from mouse_events ──
+    const motorMetrics = await this._getMotorMetrics(sessionIds);
+
     return {
       childName: child.display_name || child.email || 'Học sinh',
       periodStart: weekStart.toISOString().slice(0, 10),
@@ -213,7 +229,87 @@ class ReportsService {
       averageWordsPerMinute,
       averageEffortScore,
       booksRead: Array.from(booksMap.values()),
+      cognitiveBreakdown,
+      motorMetrics,
     };
+  }
+
+  /**
+   * Query session_replay_events to count cognitive state classifications.
+   * Returns { FLUENT: N, REGRESSION: N, DISTRACTION: N }.
+   */
+  async _getCognitiveBreakdown(sessionIds) {
+    const breakdown = { FLUENT: 0, REGRESSION: 0, DISTRACTION: 0 };
+
+    if (sessionIds.length === 0) return breakdown;
+
+    try {
+      const rows = await this.dataSource.query(
+        `
+        SELECT cognitive_state, COUNT(*)::int AS count
+        FROM session_replay_events
+        WHERE session_id = ANY($1)
+          AND cognitive_state IS NOT NULL
+        GROUP BY cognitive_state
+        `,
+        [sessionIds],
+      );
+
+      for (const row of rows) {
+        if (Object.prototype.hasOwnProperty.call(breakdown, row.cognitive_state)) {
+          breakdown[row.cognitive_state] = row.count;
+        }
+      }
+    } catch (err) {
+      // Non-fatal — report will generate without cognitive data
+      logger.warn('Failed to fetch cognitive breakdown for report', {
+        context: 'ReportsService',
+        data: { error: err.message, sessionCount: sessionIds.length },
+      });
+    }
+
+    return breakdown;
+  }
+
+  /**
+   * Query mouse_events to compute average cursor velocity and dwell time.
+   * Returns { avgVelocity, avgDwellTime, totalEvents }.
+   */
+  async _getMotorMetrics(sessionIds) {
+    const defaults = { avgVelocity: 0, avgDwellTime: 0, totalEvents: 0 };
+
+    if (sessionIds.length === 0) return defaults;
+
+    try {
+      const rows = await this.dataSource.query(
+        `
+        SELECT
+          AVG(velocity)::real   AS avg_velocity,
+          AVG(dwell_time)::real AS avg_dwell_time,
+          COUNT(*)::int         AS total_events
+        FROM mouse_events
+        WHERE session_id = ANY($1)
+          AND velocity IS NOT NULL
+        `,
+        [sessionIds],
+      );
+
+      if (rows.length > 0 && rows[0].total_events > 0) {
+        return {
+          avgVelocity: parseFloat(rows[0].avg_velocity) || 0,
+          avgDwellTime: parseFloat(rows[0].avg_dwell_time) || 0,
+          totalEvents: rows[0].total_events,
+        };
+      }
+    } catch (err) {
+      // Non-fatal — report will generate without motor data
+      logger.warn('Failed to fetch motor metrics for report', {
+        context: 'ReportsService',
+        data: { error: err.message, sessionCount: sessionIds.length },
+      });
+    }
+
+    return defaults;
   }
 }
 
@@ -224,6 +320,7 @@ InjectRepository(ReadingSessionEntity)(ReportsService, undefined, 1);
 InjectRepository(ReadingContentEntity)(ReportsService, undefined, 2);
 InjectRepository(UserEntity)(ReportsService, undefined, 3);
 Inject(GeminiService)(ReportsService, undefined, 4);
+InjectDataSource()(ReportsService, undefined, 5);
 Injectable()(ReportsService);
 
 module.exports = { ReportsService };
