@@ -365,9 +365,80 @@ class TokenService {
       await queryRunner.release();
     }
   }
+
+  // ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+  // REWARD MANAGEMENT (Clinician CRUD)
+  // ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+  async createReward(dto) {
+    const rows = await this.dataSource.query(
+      `
+      INSERT INTO rewards (name, description, cost, image_url, stock, is_active)
+      VALUES ($1, $2, $3, $4, $5, $6)
+      RETURNING id, name, description, cost, image_url, is_active, version, stock, created_at
+      `,
+      [dto.name, dto.description || null, dto.cost, dto.image_url || null, dto.stock, dto.is_active],
+    );
+
+    return rows[0];
+  }
+
+  async updateReward(rewardId, dto) {
+    const existing = await this.dataSource.query(
+      `SELECT id FROM rewards WHERE id = $1`,
+      [rewardId],
+    );
+
+    if (existing.length === 0) {
+      throw new NotFoundException('Reward not found');
+    }
+
+    const setClauses = [];
+    const params = [];
+    let paramIndex = 1;
+
+    for (const [key, value] of Object.entries(dto)) {
+      setClauses.push(`"${key}" = $${paramIndex}`);
+      params.push(value);
+      paramIndex++;
+    }
+
+    params.push(rewardId);
+    const rows = await this.dataSource.query(
+      `
+      UPDATE rewards
+      SET ${setClauses.join(', ')}, version = version + 1
+      WHERE id = $${paramIndex}
+      RETURNING id, name, description, cost, image_url, is_active, version, stock, created_at
+      `,
+      params,
+    );
+
+    return rows[0];
+  }
+
+  async deleteReward(rewardId) {
+    const existing = await this.dataSource.query(
+      `SELECT id FROM rewards WHERE id = $1`,
+      [rewardId],
+    );
+
+    if (existing.length === 0) {
+      throw new NotFoundException('Reward not found');
+    }
+
+    // Soft-delete: deactivate instead of hard delete
+    await this.dataSource.query(
+      `UPDATE rewards SET is_active = false, version = version + 1 WHERE id = $1`,
+      [rewardId],
+    );
+
+    return { message: 'Reward deactivated successfully' };
+  }
 }
 
 Injectable()(TokenService);
 InjectDataSource()(TokenService, undefined, 0);
 
 module.exports = { TokenService };
+

@@ -4,10 +4,13 @@ const {
   Controller,
   Get,
   Post,
+  Put,
+  Delete,
   Param,
   Query,
   Body,
   Req,
+  HttpCode,
   UseGuards,
   BadRequestException,
   ForbiddenException,
@@ -21,6 +24,8 @@ const { Roles } = require('../auth/decorators/roles.decorator');
 const { TokenService } = require('./gamification.service');
 const HistoryQueryDto = require('./dto/history-query.dto');
 const RedeemRewardDto = require('./dto/redeem-reward.dto');
+const CreateRewardDto = require('./dto/create-reward.dto');
+const UpdateRewardDto = require('./dto/update-reward.dto');
 
 class GamificationController {
   constructor(tokenService) {
@@ -84,6 +89,27 @@ class GamificationController {
       value.expectedVersion,
     );
     return result;
+  }
+
+  // ── POST /rewards (Clinician only) ──
+  async createReward(body) {
+    const { error, value } = CreateRewardDto.schema.validate(body);
+    if (error) throw new BadRequestException(error.details[0].message);
+    return this.tokenService.createReward(value);
+  }
+
+  // ── PUT /rewards/:rewardId (Clinician only) ──
+  async updateReward(rewardId, body) {
+    this.validateChildId(rewardId); // reuse UUID validator
+    const { error, value } = UpdateRewardDto.schema.validate(body);
+    if (error) throw new BadRequestException(error.details[0].message);
+    return this.tokenService.updateReward(rewardId, value);
+  }
+
+  // ── DELETE /rewards/:rewardId (Clinician only) ──
+  async deleteReward(rewardId) {
+    this.validateChildId(rewardId); // reuse UUID validator
+    return this.tokenService.deleteReward(rewardId);
   }
 }
 
@@ -157,5 +183,60 @@ Reflect.decorate(
 Param('rewardId')(GamificationController.prototype, 'redeemReward', 0);
 Body()(GamificationController.prototype, 'redeemReward', 1);
 Req()(GamificationController.prototype, 'redeemReward', 2);
+
+// ── POST /rewards (Clinician only) ── 201 Created ──
+const createRewardDescriptor = Object.getOwnPropertyDescriptor(
+  GamificationController.prototype,
+  'createReward',
+);
+Reflect.decorate(
+  [
+    Post('rewards'),
+    HttpCode(201),
+    UseGuards(JwtAuthGuard, RolesGuard),
+    Roles('ROLE_CLINICIAN'),
+  ],
+  GamificationController.prototype,
+  'createReward',
+  createRewardDescriptor,
+);
+Body()(GamificationController.prototype, 'createReward', 0);
+
+// ── PUT /rewards/:rewardId (Clinician only) ──
+const updateRewardDescriptor = Object.getOwnPropertyDescriptor(
+  GamificationController.prototype,
+  'updateReward',
+);
+Reflect.decorate(
+  [
+    Put('rewards/:rewardId'),
+    HttpCode(200),
+    UseGuards(JwtAuthGuard, RolesGuard),
+    Roles('ROLE_CLINICIAN'),
+  ],
+  GamificationController.prototype,
+  'updateReward',
+  updateRewardDescriptor,
+);
+Param('rewardId')(GamificationController.prototype, 'updateReward', 0);
+Body()(GamificationController.prototype, 'updateReward', 1);
+
+// ── DELETE /rewards/:rewardId (Clinician only) ──
+const deleteRewardDescriptor = Object.getOwnPropertyDescriptor(
+  GamificationController.prototype,
+  'deleteReward',
+);
+Reflect.decorate(
+  [
+    Delete('rewards/:rewardId'),
+    HttpCode(200),
+    UseGuards(JwtAuthGuard, RolesGuard),
+    Roles('ROLE_CLINICIAN'),
+  ],
+  GamificationController.prototype,
+  'deleteReward',
+  deleteRewardDescriptor,
+);
+Param('rewardId')(GamificationController.prototype, 'deleteReward', 0);
 
 module.exports = { GamificationController };
