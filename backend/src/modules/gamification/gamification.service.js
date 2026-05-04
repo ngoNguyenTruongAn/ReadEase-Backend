@@ -240,6 +240,80 @@ class TokenService {
     );
   }
 
+  async createReward(dto) {
+    const rows = await this.dataSource.query(
+      `
+      INSERT INTO rewards (name, description, cost, image_url, is_active, stock)
+      VALUES ($1, $2, $3, $4, $5, $6)
+      RETURNING id, name, description, cost, image_url, is_active, version, stock, created_at
+      `,
+      [
+        dto.name,
+        dto.description || null,
+        dto.cost,
+        dto.image_url || null,
+        dto.is_active !== undefined ? dto.is_active : true,
+        dto.stock !== undefined ? dto.stock : null,
+      ],
+    );
+
+    return rows[0];
+  }
+
+  async updateReward(rewardId, dto) {
+    const existing = await this.dataSource.query(
+      `SELECT id FROM rewards WHERE id = $1`,
+      [rewardId],
+    );
+
+    if (existing.length === 0) {
+      throw new NotFoundException('Reward not found');
+    }
+
+    const setClauses = [];
+    const params = [];
+    let paramIndex = 1;
+
+    const fields = ['name', 'description', 'cost', 'image_url', 'is_active', 'stock'];
+    for (const field of fields) {
+      if (dto[field] !== undefined) {
+        setClauses.push(`${field} = $${paramIndex}`);
+        params.push(dto[field]);
+        paramIndex++;
+      }
+    }
+
+    if (setClauses.length === 0) {
+      throw new BadRequestException('No fields to update');
+    }
+
+    params.push(rewardId);
+    const rows = await this.dataSource.query(
+      `
+      UPDATE rewards
+      SET ${setClauses.join(', ')}
+      WHERE id = $${paramIndex}
+      RETURNING id, name, description, cost, image_url, is_active, version, stock, created_at
+      `,
+      params,
+    );
+
+    return rows[0];
+  }
+
+  async deleteReward(rewardId) {
+    const result = await this.dataSource.query(
+      `DELETE FROM rewards WHERE id = $1 RETURNING id`,
+      [rewardId],
+    );
+
+    if (result.length === 0) {
+      throw new NotFoundException('Reward not found');
+    }
+
+    return { message: 'Reward deleted successfully' };
+  }
+
   async redeemReward(childId, rewardId, expectedVersion) {
     const queryRunner = this.dataSource.createQueryRunner();
     await queryRunner.connect();
@@ -365,80 +439,9 @@ class TokenService {
       await queryRunner.release();
     }
   }
-
-  // ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
-  // REWARD MANAGEMENT (Clinician CRUD)
-  // ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
-
-  async createReward(dto) {
-    const rows = await this.dataSource.query(
-      `
-      INSERT INTO rewards (name, description, cost, image_url, stock, is_active)
-      VALUES ($1, $2, $3, $4, $5, $6)
-      RETURNING id, name, description, cost, image_url, is_active, version, stock, created_at
-      `,
-      [dto.name, dto.description || null, dto.cost, dto.image_url || null, dto.stock, dto.is_active],
-    );
-
-    return rows[0];
-  }
-
-  async updateReward(rewardId, dto) {
-    const existing = await this.dataSource.query(
-      `SELECT id FROM rewards WHERE id = $1`,
-      [rewardId],
-    );
-
-    if (existing.length === 0) {
-      throw new NotFoundException('Reward not found');
-    }
-
-    const setClauses = [];
-    const params = [];
-    let paramIndex = 1;
-
-    for (const [key, value] of Object.entries(dto)) {
-      setClauses.push(`"${key}" = $${paramIndex}`);
-      params.push(value);
-      paramIndex++;
-    }
-
-    params.push(rewardId);
-    const rows = await this.dataSource.query(
-      `
-      UPDATE rewards
-      SET ${setClauses.join(', ')}, version = version + 1
-      WHERE id = $${paramIndex}
-      RETURNING id, name, description, cost, image_url, is_active, version, stock, created_at
-      `,
-      params,
-    );
-
-    return rows[0];
-  }
-
-  async deleteReward(rewardId) {
-    const existing = await this.dataSource.query(
-      `SELECT id FROM rewards WHERE id = $1`,
-      [rewardId],
-    );
-
-    if (existing.length === 0) {
-      throw new NotFoundException('Reward not found');
-    }
-
-    // Soft-delete: deactivate instead of hard delete
-    await this.dataSource.query(
-      `UPDATE rewards SET is_active = false, version = version + 1 WHERE id = $1`,
-      [rewardId],
-    );
-
-    return { message: 'Reward deactivated successfully' };
-  }
 }
 
 Injectable()(TokenService);
 InjectDataSource()(TokenService, undefined, 0);
 
 module.exports = { TokenService };
-
