@@ -388,6 +388,48 @@ class AuthService {
 
     return { accessToken, refreshToken };
   }
+
+  // ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+  // GET MY INVITE CODE — child can retrieve their invite code
+  // ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+  async getMyInviteCode(userId) {
+    const user = await this.userRepository.findOne({
+      where: { id: userId },
+      select: ['id', 'role', 'is_active', 'guardian_invite_code', 'guardian_invite_code_expires_at'],
+    });
+
+    if (!user) {
+      throw new NotFoundException('User not found');
+    }
+
+    if (user.role !== 'ROLE_CHILD') {
+      throw new BadRequestException('Only child accounts have invite codes');
+    }
+
+    if (user.is_active) {
+      return {
+        message: 'This account has already been linked to a guardian',
+        inviteCode: null,
+        isLinked: true,
+      };
+    }
+
+    if (!user.guardian_invite_code) {
+      throw new NotFoundException('No invite code found for this account');
+    }
+
+    const isExpired =
+      user.guardian_invite_code_expires_at &&
+      new Date() > new Date(user.guardian_invite_code_expires_at);
+
+    return {
+      inviteCode: user.guardian_invite_code,
+      expiresAt: user.guardian_invite_code_expires_at,
+      isExpired,
+      isLinked: false,
+    };
+  }
 }
 
 /**

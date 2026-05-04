@@ -8,6 +8,7 @@
  * POST /auth/login            — Public, returns JWT tokens
  * POST /auth/refresh          — Protected, refreshes access token
  * GET  /auth/profile          — Protected, returns current user info
+ * GET  /auth/my-invite-code   — Protected (ROLE_CHILD), returns invite code
  * POST /auth/forgot-password  — Public, sends password reset OTP
  * POST /auth/reset-password   — Public, resets password with OTP
  * POST /auth/change-password  — Protected, changes password with old password
@@ -108,6 +109,11 @@ class AuthController {
     const { error, value } = ResetPasswordDto.schema.validate(body);
     if (error) throw new BadRequestException(error.details[0].message);
     return this.authService.resetPassword(value);
+  }
+
+  // ── GET /auth/my-invite-code (Protected: JwtAuthGuard, ROLE_CHILD) ──
+  async getMyInviteCode(req) {
+    return this.authService.getMyInviteCode(req.user.sub);
   }
 
   // ── POST /auth/change-password (Protected: JwtAuthGuard) ──
@@ -225,6 +231,23 @@ Reflect.decorate(
   resetPasswordDescriptor,
 );
 Body()(AuthController.prototype, 'resetPassword', 0);
+
+// ── GET /auth/my-invite-code (Protected: JwtAuthGuard + RolesGuard, ROLE_CHILD) ──
+const myInviteCodeDescriptor = Object.getOwnPropertyDescriptor(
+  AuthController.prototype,
+  'getMyInviteCode',
+);
+Reflect.decorate(
+  [
+    Get('my-invite-code'),
+    UseGuards(JwtAuthGuard, RolesGuard),
+    Roles('ROLE_CHILD'),
+  ],
+  AuthController.prototype,
+  'getMyInviteCode',
+  myInviteCodeDescriptor,
+);
+Req()(AuthController.prototype, 'getMyInviteCode', 0);
 
 // ── POST /auth/change-password (Protected: JwtAuthGuard) ──
 const changePasswordDescriptor = Object.getOwnPropertyDescriptor(
