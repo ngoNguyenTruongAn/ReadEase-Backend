@@ -52,6 +52,16 @@ class TrackingController {
       });
     }
 
+    if (value.score > 0) {
+      await this.dataSource.query(
+        `
+        INSERT INTO tokens (child_id, amount, type, reason)
+        VALUES ($1, $2, 'EARN', $3)
+        `,
+        [childId, value.score, 'CALIBRATION_GAME'],
+      );
+    }
+
     logger.info('Calibration baseline persisted', {
       context: 'TrackingController',
       data: {

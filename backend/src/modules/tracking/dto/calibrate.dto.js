@@ -5,6 +5,7 @@ const CalibrateDto = {
     childId: Joi.string().uuid().optional(),
     duration: Joi.number().integer().min(1000).max(120000).default(30000),
     gameType: Joi.string().trim().max(100).default('target_tracking'),
+    score: Joi.number().integer().min(0).max(10000).default(0),
     events: Joi.array()
       .items(
         Joi.object({

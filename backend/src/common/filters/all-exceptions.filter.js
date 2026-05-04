@@ -29,11 +29,11 @@ class AllExceptionsFilter {
       data: {
         path: request.url,
         method: request.method,
-      },
-      error: {
-        message: exception.message,
-        name: exception.name,
-        stack: exception.stack,
+        error: {
+          message: exception.message,
+          name: exception.name,
+          stack: exception.stack,
+        },
       },
     });
 

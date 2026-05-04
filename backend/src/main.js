@@ -15,6 +15,9 @@ async function bootstrap() {
   const port = configService.get('app.port', 3000);
   const env = configService.get('app.env', 'development');
 
+  app.useBodyParser('json', { limit: '5mb' });
+  app.useBodyParser('urlencoded', { limit: '5mb', extended: true });
+
   // CORS — restrict to known frontend origins
   app.enableCors({
     origin:
