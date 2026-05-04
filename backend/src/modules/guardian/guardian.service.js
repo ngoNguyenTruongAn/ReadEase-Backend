@@ -36,6 +36,48 @@ class GuardianService {
     return rows;
   }
 
+  async listAllChildren() {
+    const rows = await this.dataSource.query(
+      `
+      SELECT
+        c.id,
+        c.email,
+        c.display_name,
+        c.is_active,
+        c.created_at,
+        cp.date_of_birth,
+        cp.grade_level,
+        COALESCE(t.balance, 0)::int AS token_balance,
+        COALESCE(s.session_count, 0)::int AS session_count,
+        s.last_session_at,
+        g.guardian_name
+      FROM users c
+      LEFT JOIN children_profiles cp ON c.id = cp.user_id
+      LEFT JOIN (
+        SELECT child_id, SUM(amount)::int AS balance
+        FROM tokens
+        GROUP BY child_id
+      ) t ON c.id = t.child_id
+      LEFT JOIN (
+        SELECT user_id, COUNT(*)::int AS session_count, MAX(ended_at) AS last_session_at
+        FROM reading_sessions
+        GROUP BY user_id
+      ) s ON c.id = s.user_id
+      LEFT JOIN (
+        SELECT gc.child_id, u.display_name AS guardian_name
+        FROM guardian_children gc
+        JOIN users u ON gc.guardian_id = u.id
+        LIMIT 1
+      ) g ON c.id = g.child_id
+      WHERE c.role = 'ROLE_CHILD'
+        AND c.deleted_at IS NULL
+      ORDER BY c.created_at DESC
+      `,
+    );
+
+    return rows;
+  }
+
   async linkChild(guardianId, inviteCode) {
     const queryRunner = this.dataSource.createQueryRunner();
     await queryRunner.connect();
