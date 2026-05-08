@@ -112,6 +112,12 @@ class GamificationController {
     );
     return result;
   }
+
+  async getCollection(childId, req) {
+    this.validateChildId(childId);
+    this.assertChildAccess(childId, req.user);
+    return this.tokenService.getCollection(childId);
+  }
 }
 
 Controller('api/v1')(GamificationController);
@@ -173,12 +179,7 @@ const createRewardDescriptor = Object.getOwnPropertyDescriptor(
   'createReward',
 );
 Reflect.decorate(
-  [
-    Post('rewards'),
-    HttpCode(201),
-    UseGuards(JwtAuthGuard, RolesGuard),
-    Roles('ROLE_CLINICIAN'),
-  ],
+  [Post('rewards'), HttpCode(201), UseGuards(JwtAuthGuard, RolesGuard), Roles('ROLE_CLINICIAN')],
   GamificationController.prototype,
   'createReward',
   createRewardDescriptor,
@@ -191,11 +192,7 @@ const updateRewardDescriptor = Object.getOwnPropertyDescriptor(
   'updateReward',
 );
 Reflect.decorate(
-  [
-    Put('rewards/:rewardId'),
-    UseGuards(JwtAuthGuard, RolesGuard),
-    Roles('ROLE_CLINICIAN'),
-  ],
+  [Put('rewards/:rewardId'), UseGuards(JwtAuthGuard, RolesGuard), Roles('ROLE_CLINICIAN')],
   GamificationController.prototype,
   'updateReward',
   updateRewardDescriptor,
@@ -209,11 +206,7 @@ const deleteRewardDescriptor = Object.getOwnPropertyDescriptor(
   'deleteReward',
 );
 Reflect.decorate(
-  [
-    Delete('rewards/:rewardId'),
-    UseGuards(JwtAuthGuard, RolesGuard),
-    Roles('ROLE_CLINICIAN'),
-  ],
+  [Delete('rewards/:rewardId'), UseGuards(JwtAuthGuard, RolesGuard), Roles('ROLE_CLINICIAN')],
   GamificationController.prototype,
   'deleteReward',
   deleteRewardDescriptor,
@@ -238,5 +231,23 @@ Reflect.decorate(
 Param('rewardId')(GamificationController.prototype, 'redeemReward', 0);
 Body()(GamificationController.prototype, 'redeemReward', 1);
 Req()(GamificationController.prototype, 'redeemReward', 2);
+
+// ── GET /tokens/:childId/collection (Protected) — Get reward collection ──
+const getCollectionDescriptor = Object.getOwnPropertyDescriptor(
+  GamificationController.prototype,
+  'getCollection',
+);
+Reflect.decorate(
+  [
+    Get('tokens/:childId/collection'),
+    UseGuards(JwtAuthGuard, RolesGuard),
+    Roles('ROLE_CHILD', 'ROLE_GUARDIAN', 'ROLE_CLINICIAN'),
+  ],
+  GamificationController.prototype,
+  'getCollection',
+  getCollectionDescriptor,
+);
+Param('childId')(GamificationController.prototype, 'getCollection', 0);
+Req()(GamificationController.prototype, 'getCollection', 1);
 
 module.exports = { GamificationController };
