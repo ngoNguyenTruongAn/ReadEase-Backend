@@ -166,6 +166,19 @@ class AuthService {
     }
 
     user.role = dto.role;
+
+    // If child role and no invite code yet, generate one now
+    let inviteCode = null;
+    if (dto.role === 'ROLE_CHILD' && !user.guardian_invite_code) {
+      const crypto = require('crypto');
+      inviteCode = crypto.randomBytes(4).toString('hex').toUpperCase();
+      user.guardian_invite_code = inviteCode;
+      const expiresAt = new Date();
+      expiresAt.setDate(expiresAt.getDate() + 7);
+      user.guardian_invite_code_expires_at = expiresAt;
+      user.is_active = false; // Must be activated by Guardian
+    }
+
     await this.userRepository.save(user);
 
     // Re-generate tokens with new role
@@ -173,12 +186,13 @@ class AuthService {
 
     logger.info('Role updated', {
       context: 'AuthService',
-      data: { userId: user.id, role: dto.role },
+      data: { userId: user.id, role: dto.role, inviteCodeGenerated: !!inviteCode },
     });
 
     return {
       message: `Role updated: ${dto.role}`,
       ...tokens,
+      ...(inviteCode && { inviteCode }),
       user: {
         id: user.id,
         email: user.email,
@@ -396,7 +410,13 @@ class AuthService {
   async getMyInviteCode(userId) {
     const user = await this.userRepository.findOne({
       where: { id: userId },
-      select: ['id', 'role', 'is_active', 'guardian_invite_code', 'guardian_invite_code_expires_at'],
+      select: [
+        'id',
+        'role',
+        'is_active',
+        'guardian_invite_code',
+        'guardian_invite_code_expires_at',
+      ],
     });
 
     if (!user) {
