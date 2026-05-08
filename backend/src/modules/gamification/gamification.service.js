@@ -261,10 +261,9 @@ class TokenService {
   }
 
   async updateReward(rewardId, dto) {
-    const existing = await this.dataSource.query(
-      `SELECT id FROM rewards WHERE id = $1`,
-      [rewardId],
-    );
+    const existing = await this.dataSource.query(`SELECT id FROM rewards WHERE id = $1`, [
+      rewardId,
+    ]);
 
     if (existing.length === 0) {
       throw new NotFoundException('Reward not found');
@@ -302,10 +301,9 @@ class TokenService {
   }
 
   async deleteReward(rewardId) {
-    const result = await this.dataSource.query(
-      `DELETE FROM rewards WHERE id = $1 RETURNING id`,
-      [rewardId],
-    );
+    const result = await this.dataSource.query(`DELETE FROM rewards WHERE id = $1 RETURNING id`, [
+      rewardId,
+    ]);
 
     if (result.length === 0) {
       throw new NotFoundException('Reward not found');
@@ -438,6 +436,38 @@ class TokenService {
     } finally {
       await queryRunner.release();
     }
+  }
+
+  /**
+   * Get child's reward collection (all redeemed rewards grouped by type)
+   */
+  async getCollection(childId) {
+    const rows = await this.dataSource.query(
+      `
+      SELECT
+        r.id           AS reward_id,
+        r.name,
+        r.description,
+        r.image_url,
+        r.cost,
+        COUNT(*)::int  AS quantity,
+        MIN(rd.redeemed_at) AS first_redeemed_at,
+        MAX(rd.redeemed_at) AS last_redeemed_at
+      FROM redemptions rd
+      JOIN rewards r ON r.id = rd.reward_id
+      WHERE rd.child_id = $1
+      GROUP BY r.id, r.name, r.description, r.image_url, r.cost
+      ORDER BY MAX(rd.redeemed_at) DESC
+      `,
+      [childId],
+    );
+
+    return {
+      childId,
+      totalItems: rows.reduce((sum, row) => sum + Number(row.quantity), 0),
+      uniqueItems: rows.length,
+      items: rows,
+    };
   }
 }
 
