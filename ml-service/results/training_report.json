@@ -1,0 +1,84 @@
+{
+  "trained_at": "2026-05-10T18:44:30",
+  "n_samples": 3000,
+  "n_train": 2400,
+  "n_test": 600,
+  "accuracy": 1.0,
+  "cv_mean": 1.0,
+  "cv_std": 0.0,
+  "cv_scores": [
+    1.0,
+    1.0,
+    1.0,
+    1.0,
+    1.0
+  ],
+  "classification_report": "              precision    recall  f1-score   support\n\n DISTRACTION       1.00      1.00      1.00       200\n      FLUENT       1.00      1.00      1.00       200\n  REGRESSION       1.00      1.00      1.00       200\n\n    accuracy                           1.00       600\n   macro avg       1.00      1.00      1.00       600\nweighted avg       1.00      1.00      1.00       600\n",
+  "confusion_matrix": [
+    [
+      200,
+      0,
+      0
+    ],
+    [
+      0,
+      200,
+      0
+    ],
+    [
+      0,
+      0,
+      200
+    ]
+  ],
+  "feature_importances": [
+    [
+      "dwell_time_max",
+      0.221638
+    ],
+    [
+      "velocity_max",
+      0.160109
+    ],
+    [
+      "velocity_mean",
+      0.139164
+    ],
+    [
+      "direction_changes",
+      0.110915
+    ],
+    [
+      "dwell_time_mean",
+      0.110819
+    ],
+    [
+      "velocity_std",
+      0.096887
+    ],
+    [
+      "path_efficiency",
+      0.062857
+    ],
+    [
+      "curvature_std",
+      0.043348
+    ],
+    [
+      "regression_count",
+      0.037106
+    ],
+    [
+      "curvature_mean",
+      0.015811
+    ],
+    [
+      "acceleration_std",
+      0.000954
+    ],
+    [
+      "acceleration_mean",
+      0.000393
+    ]
+  ]
+}
