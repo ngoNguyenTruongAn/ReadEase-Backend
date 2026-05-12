@@ -35,7 +35,6 @@ async function bootstrap() {
     credentials: true,
   });
 
-
   // Global filters — order matters: AllExceptions first (catch-all), then HttpException
   app.useGlobalFilters(new AllExceptionsFilter(), new HttpExceptionFilter());
 
