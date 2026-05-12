@@ -362,7 +362,18 @@ class AuthService {
         { expiresIn: '15m' },
       );
 
-      return { accessToken };
+      // Issue a fresh tracking token for WebSocket connections
+      const crypto = require('crypto');
+      const trackingToken = this.jwtService.sign(
+        {
+          user_id: user.id,
+          session_id: crypto.randomUUID(),
+          role: user.role,
+        },
+        { expiresIn: '24h' },
+      );
+
+      return { accessToken, trackingToken };
     } catch {
       throw new UnauthorizedException('Invalid refresh token');
     }
@@ -382,7 +393,7 @@ class AuthService {
   }
 
   // ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
-  // HELPER — generate access + refresh tokens
+  // HELPER — generate access + refresh + tracking tokens
   // ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
 
   generateTokens(user) {
@@ -400,7 +411,19 @@ class AuthService {
       expiresIn: '7d',
     });
 
-    return { accessToken, refreshToken };
+    // Tracking token for WebSocket /tracking connections
+    // Contains user_id + session_id required by TrackingGateway jwt-auth
+    const crypto = require('crypto');
+    const trackingToken = this.jwtService.sign(
+      {
+        user_id: user.id,
+        session_id: crypto.randomUUID(),
+        role: user.role,
+      },
+      { expiresIn: '24h' },
+    );
+
+    return { accessToken, refreshToken, trackingToken };
   }
 
   // ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
