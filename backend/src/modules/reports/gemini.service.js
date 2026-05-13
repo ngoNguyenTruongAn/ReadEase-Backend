@@ -34,7 +34,8 @@ class GeminiService {
    * Priority: OpenRouter API key → Google Gemini SDK → fallback mode.
    */
   _initClient() {
-    const openRouterKey = this.configService.get('OPENROUTER_API_KEY') || process.env.OPENROUTER_API_KEY;
+    const openRouterKey =
+      this.configService.get('OPENROUTER_API_KEY') || process.env.OPENROUTER_API_KEY;
     const geminiKey = this.configService.get('gemini.apiKey');
     this.modelName = this.configService.get('gemini.model') || 'gemini-2.0-flash';
     this.provider = 'none'; // 'openrouter' | 'google' | 'none'
@@ -183,7 +184,7 @@ class GeminiService {
       const res = await fetch('https://openrouter.ai/api/v1/chat/completions', {
         method: 'POST',
         headers: {
-          'Authorization': `Bearer ${this.openRouterKey}`,
+          Authorization: `Bearer ${this.openRouterKey}`,
           'Content-Type': 'application/json',
           'HTTP-Referer': 'https://readease.app',
           'X-Title': 'ReadEase',

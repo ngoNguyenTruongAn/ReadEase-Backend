@@ -6,7 +6,13 @@
  * to generate a Dyslexia-aware Markdown report, and persists the result.
  */
 
-const { Injectable, NotFoundException, ConflictException } = require('@nestjs/common');
+const {
+  Injectable,
+  NotFoundException,
+  ConflictException,
+  ForbiddenException,
+  BadRequestException,
+} = require('@nestjs/common');
 const { InjectRepository, InjectDataSource } = require('@nestjs/typeorm');
 const { Between } = require('typeorm');
 
@@ -93,26 +99,63 @@ class ReportsService {
     // ── 4. Generate report via Gemini ──
     const aiResult = await this.geminiService.generateWeeklyReport(aggregatedData);
 
-    // ── 5. Persist the report ──
+    // ── 5. Persist the report as DRAFT ──
     const report = this.reportRepository.create({
       child_id: childId,
       report_type: 'WEEKLY',
       content: aiResult.content,
       ai_model: aiResult.model,
+      status: 'DRAFT',
       period_start: weekStart,
       period_end: weekEnd,
     });
 
     await this.reportRepository.save(report);
 
-    logger.info('Weekly report saved', {
+    logger.info('Weekly report saved as DRAFT', {
       context: 'ReportsService',
       data: {
         reportId: report.id,
         childId,
+        status: 'DRAFT',
         model: aiResult.model,
         isFallback: aiResult.isFallback,
       },
+    });
+
+    return report;
+  }
+
+  // ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+  // APPROVE REPORT (CLINICIAN)
+  // ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+  /**
+   * Clinician approves a DRAFT report → status becomes APPROVED.
+   * Only then will the guardian be able to see the report.
+   */
+  async approveReport(reportId, clinicianId) {
+    const report = await this.reportRepository.findOne({
+      where: { id: reportId },
+    });
+
+    if (!report) {
+      throw new NotFoundException(`Report ${reportId} not found`);
+    }
+
+    if (report.status === 'APPROVED') {
+      throw new ConflictException('Report is already approved');
+    }
+
+    report.status = 'APPROVED';
+    report.approved_by = clinicianId;
+    report.approved_at = new Date();
+
+    await this.reportRepository.save(report);
+
+    logger.info('Report approved by clinician', {
+      context: 'ReportsService',
+      data: { reportId, clinicianId, status: 'APPROVED' },
     });
 
     return report;
@@ -123,11 +166,19 @@ class ReportsService {
   // ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
 
   /**
-   * Retrieve all reports for a specific child, ordered by period descending.
+   * Retrieve reports for a child.
+   * - Clinician: sees ALL (DRAFT + APPROVED)
+   * - Guardian:  sees only APPROVED
    */
-  async getReportsByChildId(childId) {
+  async getReportsByChildId(childId, user) {
+    const where = { child_id: childId };
+
+    if (user.role === 'ROLE_GUARDIAN') {
+      where.status = 'APPROVED';
+    }
+
     return this.reportRepository.find({
-      where: { child_id: childId },
+      where,
       order: { period_start: 'DESC' },
     });
   }
@@ -137,15 +188,20 @@ class ReportsService {
   // ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
 
   /**
-   * Retrieve a single report by its UUID.
+   * Retrieve a single report.
+   * Guardian can only access APPROVED reports.
    */
-  async getReportById(reportId) {
+  async getReportById(reportId, user) {
     const report = await this.reportRepository.findOne({
       where: { id: reportId },
     });
 
     if (!report) {
       throw new NotFoundException(`Report ${reportId} not found`);
+    }
+
+    if (user.role === 'ROLE_GUARDIAN' && report.status !== 'APPROVED') {
+      throw new ForbiddenException('This report has not been approved yet');
     }
 
     return report;

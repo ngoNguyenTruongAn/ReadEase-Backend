@@ -239,8 +239,9 @@ describe('ReportsService', () => {
     reportRepo.find.mockResolvedValue([{ id: 'r1' }, { id: 'r2' }]);
 
     const { svc } = buildService({ reportRepo });
+    const mockUser = { sub: 'clinician-1', role: 'ROLE_CLINICIAN' };
 
-    const result = await svc.getReportsByChildId(childId);
+    const result = await svc.getReportsByChildId(childId, mockUser);
 
     expect(reportRepo.find).toHaveBeenCalledWith({
       where: { child_id: childId },
@@ -253,11 +254,12 @@ describe('ReportsService', () => {
 
   it('should return a single report by ID', async () => {
     const reportRepo = makeRepoMock();
-    reportRepo.findOne.mockResolvedValue({ id: 'r1', content: '...' });
+    reportRepo.findOne.mockResolvedValue({ id: 'r1', content: '...', status: 'APPROVED' });
 
     const { svc } = buildService({ reportRepo });
+    const mockUser = { sub: 'clinician-1', role: 'ROLE_CLINICIAN' };
 
-    const result = await svc.getReportById('r1');
+    const result = await svc.getReportById('r1', mockUser);
 
     expect(result.id).toBe('r1');
   });
@@ -269,8 +271,9 @@ describe('ReportsService', () => {
     reportRepo.findOne.mockResolvedValue(null);
 
     const { svc } = buildService({ reportRepo });
+    const mockUser = { sub: 'clinician-1', role: 'ROLE_CLINICIAN' };
 
-    await expect(svc.getReportById('nonexistent')).rejects.toThrow(NotFoundException);
+    await expect(svc.getReportById('nonexistent', mockUser)).rejects.toThrow(NotFoundException);
   });
 
   // ── Test 8: _aggregateSessionData with sessions ─────────────────────────
