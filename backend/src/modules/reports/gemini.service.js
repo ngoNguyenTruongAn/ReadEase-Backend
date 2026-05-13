@@ -30,45 +30,48 @@ class GeminiService {
   }
 
   /**
-   * Lazily initialise the Gemini SDK client.
-   * If no API key is configured, the service operates in fallback mode.
+   * Lazily initialise the AI client.
+   * Priority: OpenRouter API key → Google Gemini SDK → fallback mode.
    */
   _initClient() {
-    const apiKey = this.configService.get('gemini.apiKey');
+    const openRouterKey = this.configService.get('OPENROUTER_API_KEY') || process.env.OPENROUTER_API_KEY;
+    const geminiKey = this.configService.get('gemini.apiKey');
     this.modelName = this.configService.get('gemini.model') || 'gemini-2.0-flash';
+    this.provider = 'none'; // 'openrouter' | 'google' | 'none'
 
-    if (apiKey) {
-      this.client = new GoogleGenerativeAI(apiKey);
+    if (openRouterKey) {
+      // ── OpenRouter mode (OpenAI-compatible API) ──
+      this.openRouterKey = openRouterKey;
+      this.openRouterModel = process.env.OPENROUTER_MODEL || 'google/gemini-2.0-flash-exp:free';
+      this.provider = 'openrouter';
+      logger.info('AI client initialised via OpenRouter', {
+        context: 'GeminiService',
+        data: { model: this.openRouterModel },
+      });
+    } else if (geminiKey) {
+      // ── Google Gemini SDK mode ──
+      this.client = new GoogleGenerativeAI(geminiKey);
+      this.provider = 'google';
       logger.info('Gemini client initialised', {
         context: 'GeminiService',
         data: { model: this.modelName },
       });
     } else {
-      logger.warn('GEMINI_API_KEY not configured — reports will use fallback mode', {
+      logger.warn('No AI API key configured — reports will use fallback mode', {
         context: 'GeminiService',
       });
     }
   }
 
   /**
-   * Generate a weekly reading progress report via Gemini.
+   * Generate a weekly reading progress report via AI.
    *
    * @param {object} data - Aggregated reading data for the week
-   * @param {string} data.childName
-   * @param {string} data.periodStart - ISO date string
-   * @param {string} data.periodEnd - ISO date string
-   * @param {number} data.totalSessions
-   * @param {number} data.totalReadingMinutes
-   * @param {number} data.averageWordsPerMinute
-   * @param {number} data.averageEffortScore - 0-1 scale
-   * @param {Array}  data.booksRead - [{ title, difficulty, wordCount }]
-   * @param {object} data.cognitiveBreakdown - { FLUENT, REGRESSION, DISTRACTION }
-   * @param {object} data.motorMetrics - { avgVelocity, avgDwellTime, totalEvents }
    * @returns {Promise<{ content: string, model: string, isFallback: boolean }>}
    */
   async generateWeeklyReport(data) {
-    // ── Fallback mode when no client is available ──
-    if (!this.client) {
+    // ── Fallback mode when no provider is available ──
+    if (this.provider === 'none') {
       logger.info('Generating fallback report (no API key)', {
         context: 'GeminiService',
       });
@@ -79,52 +82,53 @@ class GeminiService {
       };
     }
 
-    // ── Call Gemini API with retry ──
+    // ── Call AI with retry (OpenRouter or Google SDK) ──
     try {
       const prompt = this._buildPrompt(data);
-      const model = this.client.getGenerativeModel({
-        model: this.modelName,
-        generationConfig: {
-          temperature: 0.7,
-          topP: 0.85,
-          maxOutputTokens: 1024,
-        },
-      });
+      let model = null;
+
+      if (this.provider === 'google') {
+        model = this.client.getGenerativeModel({
+          model: this.modelName,
+          generationConfig: {
+            temperature: 0.7,
+            topP: 0.85,
+            maxOutputTokens: 1024,
+          },
+        });
+      }
 
       const result = await this._callWithRetry(model, prompt);
       const response = result.response;
       const text = response.text();
 
       if (!text || text.trim().length < 20) {
-        throw new Error('Gemini returned empty or too-short response');
+        throw new Error('AI returned empty or too-short response');
       }
 
-      logger.info('Gemini report generated successfully', {
+      const usedModel = this.provider === 'openrouter' ? this.openRouterModel : this.modelName;
+      logger.info('AI report generated successfully', {
         context: 'GeminiService',
-        data: { model: this.modelName, length: text.length },
+        data: { provider: this.provider, model: usedModel, length: text.length },
       });
 
       return {
         content: text.trim(),
-        model: this.modelName,
+        model: usedModel,
         isFallback: false,
       };
     } catch (error) {
-      // Detect quota-exceeded (429) errors specifically for clearer monitoring
       const isQuotaError = error.message?.includes('429') || error.message?.includes('quota');
 
       if (isQuotaError) {
-        logger.warn(
-          'Gemini API quota exceeded (429) — using fallback report. Check your plan and billing at https://ai.google.dev/gemini-api/docs/rate-limits',
-          {
-            context: 'GeminiService',
-            data: { model: this.modelName, error: error.message },
-          },
-        );
-      } else {
-        logger.error('Gemini API call failed, falling back to local report', {
+        logger.warn('AI quota exceeded (429) — using fallback report', {
           context: 'GeminiService',
-          data: { error: error.message },
+          data: { provider: this.provider, error: error.message },
+        });
+      } else {
+        logger.error('AI call failed, falling back to local report', {
+          context: 'GeminiService',
+          data: { provider: this.provider, error: error.message },
         });
       }
 
@@ -136,19 +140,20 @@ class GeminiService {
     }
   }
 
-  // ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
-  // RETRY LOGIC
-  // ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
-
   /**
-   * Call Gemini with a single automatic retry for transient network errors.
-   * Does NOT retry on quota errors (429) — those are immediately propagated.
+   * Call AI provider with a single automatic retry for transient network errors.
+   * Supports both Google SDK and OpenRouter (OpenAI-compatible).
    */
-  async _callWithRetry(model, prompt) {
+  async _callWithRetry(modelOrNull, prompt) {
+    if (this.provider === 'openrouter') {
+      return this._callOpenRouter(prompt);
+    }
+
+    // Google Gemini SDK path
     for (let attempt = 0; attempt <= MAX_RETRIES; attempt++) {
       try {
         return await Promise.race([
-          model.generateContent(prompt),
+          modelOrNull.generateContent(prompt),
           new Promise((_, reject) =>
             setTimeout(() => reject(new Error('Gemini API timeout')), GENERATION_TIMEOUT_MS),
           ),
@@ -163,6 +168,55 @@ class GeminiService {
         });
         await new Promise((r) => setTimeout(r, RETRY_DELAY_MS));
       }
+    }
+  }
+
+  /**
+   * Call OpenRouter's OpenAI-compatible chat completions endpoint.
+   * Returns an object matching the Google SDK response shape: { response: { text() } }
+   */
+  async _callOpenRouter(prompt) {
+    const controller = new AbortController();
+    const timeout = setTimeout(() => controller.abort(), GENERATION_TIMEOUT_MS);
+
+    try {
+      const res = await fetch('https://openrouter.ai/api/v1/chat/completions', {
+        method: 'POST',
+        headers: {
+          'Authorization': `Bearer ${this.openRouterKey}`,
+          'Content-Type': 'application/json',
+          'HTTP-Referer': 'https://readease.app',
+          'X-Title': 'ReadEase',
+        },
+        body: JSON.stringify({
+          model: this.openRouterModel,
+          messages: [{ role: 'user', content: prompt }],
+          temperature: 0.7,
+          top_p: 0.85,
+          max_tokens: 1024,
+        }),
+        signal: controller.signal,
+      });
+
+      clearTimeout(timeout);
+
+      if (!res.ok) {
+        const errBody = await res.text();
+        throw new Error(`OpenRouter ${res.status}: ${errBody}`);
+      }
+
+      const json = await res.json();
+      const text = json.choices?.[0]?.message?.content || '';
+
+      // Return shape matching Google SDK for compatibility
+      return {
+        response: {
+          text: () => text,
+        },
+      };
+    } catch (err) {
+      clearTimeout(timeout);
+      throw err;
     }
   }
 

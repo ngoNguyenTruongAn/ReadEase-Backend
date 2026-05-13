@@ -36,7 +36,52 @@ class GuardianService {
     return rows;
   }
 
-  async listAllChildren() {
+  /**
+   * List children based on the caller's role:
+   * - ROLE_CLINICIAN → all children in the system
+   * - ROLE_GUARDIAN  → only children linked to this guardian
+   */
+  async listAllChildren(user) {
+    if (user.role === 'ROLE_GUARDIAN') {
+      // Guardian: only their linked children (with enriched data)
+      const rows = await this.dataSource.query(
+        `
+        SELECT
+          c.id,
+          c.email,
+          c.display_name,
+          c.is_active,
+          c.created_at,
+          cp.date_of_birth,
+          cp.grade_level,
+          COALESCE(t.balance, 0)::int AS token_balance,
+          COALESCE(s.session_count, 0)::int AS session_count,
+          s.last_session_at,
+          gc.consent_given_at
+        FROM users c
+        JOIN guardian_children gc ON c.id = gc.child_id
+        LEFT JOIN children_profiles cp ON c.id = cp.user_id
+        LEFT JOIN (
+          SELECT child_id, SUM(amount)::int AS balance
+          FROM tokens
+          GROUP BY child_id
+        ) t ON c.id = t.child_id
+        LEFT JOIN (
+          SELECT user_id, COUNT(*)::int AS session_count, MAX(ended_at) AS last_session_at
+          FROM reading_sessions
+          GROUP BY user_id
+        ) s ON c.id = s.user_id
+        WHERE gc.guardian_id = $1
+          AND c.deleted_at IS NULL
+        ORDER BY c.created_at DESC
+        `,
+        [user.sub],
+      );
+
+      return rows;
+    }
+
+    // Clinician: all children in the system
     const rows = await this.dataSource.query(
       `
       SELECT

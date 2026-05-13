@@ -29,6 +29,8 @@ services:
       - ML_TIMEOUT_MS=${ML_TIMEOUT_MS:-5000}
       - GEMINI_API_KEY=${GEMINI_API_KEY:-}
       - GEMINI_MODEL=${GEMINI_MODEL:-gemini-2.0-flash}
+      - OPENROUTER_API_KEY=${OPENROUTER_API_KEY:-}
+      - OPENROUTER_MODEL=${OPENROUTER_MODEL:-google/gemini-2.0-flash-exp:free}
     volumes:
       - ./backend/src:/app/src
       - ./backend/test:/app/test
