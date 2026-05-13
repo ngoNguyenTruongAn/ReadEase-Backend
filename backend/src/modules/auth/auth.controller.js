@@ -238,11 +238,7 @@ const myInviteCodeDescriptor = Object.getOwnPropertyDescriptor(
   'getMyInviteCode',
 );
 Reflect.decorate(
-  [
-    Get('my-invite-code'),
-    UseGuards(JwtAuthGuard, RolesGuard),
-    Roles('ROLE_CHILD'),
-  ],
+  [Get('my-invite-code'), UseGuards(JwtAuthGuard, RolesGuard), Roles('ROLE_CHILD')],
   AuthController.prototype,
   'getMyInviteCode',
   myInviteCodeDescriptor,

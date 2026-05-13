@@ -13,8 +13,10 @@ const schema = Joi.object({
   image_url: Joi.string().uri().max(500).allow('', null),
   is_active: Joi.boolean(),
   stock: Joi.number().integer().min(0).allow(null),
-}).min(1).messages({
-  'object.min': 'At least one field is required to update',
-});
+})
+  .min(1)
+  .messages({
+    'object.min': 'At least one field is required to update',
+  });
 
 module.exports = { schema };

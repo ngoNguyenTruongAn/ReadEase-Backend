@@ -148,13 +148,17 @@ function extractFeatures(points) {
   return {
     velocity_mean: Number(mean(velocities).toFixed(4)),
     velocity_std: Number(std(velocities).toFixed(4)),
-    velocity_max: velocities.length ? Number(Math.max(...velocities).toFixed(4)) : 0,
+    velocity_max: velocities.length
+      ? Number(velocities.reduce((max, v) => (v > max ? v : max), 0).toFixed(4))
+      : 0,
     acceleration_mean: Number(mean(accelerations).toFixed(4)),
     acceleration_std: Number(std(accelerations).toFixed(4)),
     curvature_mean: Number(mean(curvatures).toFixed(4)),
     curvature_std: Number(std(curvatures).toFixed(4)),
     dwell_time_mean: Number(mean(dwellTimes).toFixed(2)),
-    dwell_time_max: dwellTimes.length ? Number(Math.max(...dwellTimes).toFixed(2)) : 0,
+    dwell_time_max: dwellTimes.length
+      ? Number(dwellTimes.reduce((max, v) => (v > max ? v : max), 0).toFixed(2))
+      : 0,
     direction_changes: directionChanges,
     regression_count: regressionCount,
     path_efficiency: Number(pathEfficiency.toFixed(4)),

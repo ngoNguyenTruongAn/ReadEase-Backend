@@ -12,7 +12,7 @@ const { logger } = require('../../../common/logger/winston.config');
 const { extractFeatures } = require('../utils/feature-extractor');
 
 const ML_TIMEOUT = parseInt(process.env.ML_CLASSIFY_TIMEOUT || '3000', 10);
-const ML_URL = process.env.ML_SERVICE_URL || 'http://localhost:8000';
+const ML_URL = process.env.ML_SERVICE_URL || process.env.ML_ENGINE_URL || 'http://ml-engine:8000';
 
 class MlClientService {
   constructor(httpService) {
