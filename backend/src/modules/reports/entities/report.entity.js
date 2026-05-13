@@ -31,6 +31,19 @@ const ReportEntity = new EntitySchema({
       default:
         'Báo cáo này được tạo bởi trí tuệ nhân tạo (AI) và chỉ mang tính tham khảo. Vui lòng tham vấn chuyên gia để được đánh giá chính xác.',
     },
+    status: {
+      type: 'varchar',
+      length: 20,
+      default: "'DRAFT'",
+    },
+    approved_by: {
+      type: 'uuid',
+      nullable: true,
+    },
+    approved_at: {
+      type: 'timestamptz',
+      nullable: true,
+    },
     period_start: {
       type: 'date',
     },

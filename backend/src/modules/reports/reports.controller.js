@@ -3,10 +3,16 @@
  *
  * REST API for AI-generated reading progress reports.
  *
+ * Flow:
+ *   1. Clinician generates a report  → status = DRAFT
+ *   2. Clinician approves the report  → status = APPROVED
+ *   3. Guardian can only see APPROVED reports
+ *
  * Endpoints:
- *   POST  /api/v1/reports/generate/:childId  — Generate weekly report
- *   GET   /api/v1/reports/:childId           — List reports for a child
- *   GET   /api/v1/reports/detail/:reportId   — Get single report
+ *   POST   /api/v1/reports/generate/:childId     — Generate (CLINICIAN only)
+ *   PATCH  /api/v1/reports/approve/:reportId      — Approve  (CLINICIAN only)
+ *   GET    /api/v1/reports/:childId               — List reports
+ *   GET    /api/v1/reports/detail/:reportId        — Get single report
  */
 
 require('reflect-metadata');
@@ -15,8 +21,10 @@ const {
   Controller,
   Post,
   Get,
+  Patch,
   Param,
   Body,
+  Req,
   UseGuards,
   BadRequestException,
   Inject,
@@ -35,9 +43,8 @@ class ReportsController {
   /**
    * POST /api/v1/reports/generate/:childId
    *
-   * Generate a weekly reading report using Gemini AI.
-   * Body (optional): { weekStart: "2026-04-07", weekEnd: "2026-04-14" }
-   * Defaults to the past 7 days if not provided.
+   * Generate a weekly reading report using AI.
+   * Only CLINICIAN can generate. Report starts as DRAFT.
    */
   async generateReport(childId, body) {
     const { weekStart, weekEnd } = this._resolveWeekRange(body);
@@ -45,7 +52,22 @@ class ReportsController {
     const report = await this.reportsService.generateWeeklyReport(childId, weekStart, weekEnd);
 
     return {
-      message: 'Weekly reading report generated successfully',
+      message: 'Report generated as DRAFT. Please review and approve to send to guardian.',
+      data: report,
+    };
+  }
+
+  /**
+   * PATCH /api/v1/reports/approve/:reportId
+   *
+   * Clinician approves a DRAFT report → status becomes APPROVED.
+   * Guardian can then see it.
+   */
+  async approveReport(reportId, req) {
+    const report = await this.reportsService.approveReport(reportId, req.user.sub);
+
+    return {
+      message: 'Report approved and now visible to guardian.',
       data: report,
     };
   }
@@ -53,29 +75,28 @@ class ReportsController {
   /**
    * GET /api/v1/reports/:childId
    *
-   * List all reports for a given child, ordered by newest first.
+   * List reports for a child.
+   * - Clinician sees ALL (DRAFT + APPROVED)
+   * - Guardian sees only APPROVED
    */
-  async listReports(childId) {
-    return this.reportsService.getReportsByChildId(childId);
+  async listReports(childId, req) {
+    return this.reportsService.getReportsByChildId(childId, req.user);
   }
 
   /**
    * GET /api/v1/reports/detail/:reportId
    *
-   * Retrieve a single report by its UUID.
+   * Retrieve a single report.
+   * Guardian can only access APPROVED reports.
    */
-  async getReportDetail(reportId) {
-    return this.reportsService.getReportById(reportId);
+  async getReportDetail(reportId, req) {
+    return this.reportsService.getReportById(reportId, req.user);
   }
 
   // ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
   // HELPER — resolve week date range
   // ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
 
-  /**
-   * Parse weekStart / weekEnd from the request body.
-   * Falls back to the last 7 days if not provided.
-   */
   _resolveWeekRange(body) {
     const now = new Date();
     let weekEnd;
@@ -86,8 +107,6 @@ class ReportsController {
       if (isNaN(weekEnd.getTime())) {
         throw new BadRequestException('Invalid weekEnd date format');
       }
-      // If only a date string was provided (no time component), set to end of day
-      // so that sessions created on this day are included in the range
       if (typeof body.weekEnd === 'string' && body.weekEnd.length <= 10) {
         weekEnd.setHours(23, 59, 59, 999);
       }
@@ -100,7 +119,6 @@ class ReportsController {
       if (isNaN(weekStart.getTime())) {
         throw new BadRequestException('Invalid weekStart date format');
       }
-      // If only a date string was provided, set to start of day
       if (typeof body.weekStart === 'string' && body.weekStart.length <= 10) {
         weekStart.setHours(0, 0, 0, 0);
       }
@@ -123,17 +141,13 @@ class ReportsController {
 Controller('api/v1/reports')(ReportsController);
 Inject(ReportsService)(ReportsController, undefined, 0);
 
-// POST /api/v1/reports/generate/:childId — Generate report
+// POST /api/v1/reports/generate/:childId — Generate (CLINICIAN only)
 const generateReportDescriptor = Object.getOwnPropertyDescriptor(
   ReportsController.prototype,
   'generateReport',
 );
 Reflect.decorate(
-  [
-    Post('generate/:childId'),
-    UseGuards(JwtAuthGuard, RolesGuard),
-    Roles('ROLE_CLINICIAN', 'ROLE_GUARDIAN'),
-  ],
+  [Post('generate/:childId'), UseGuards(JwtAuthGuard, RolesGuard), Roles('ROLE_CLINICIAN')],
   ReportsController.prototype,
   'generateReport',
   generateReportDescriptor,
@@ -141,7 +155,21 @@ Reflect.decorate(
 Param('childId')(ReportsController.prototype, 'generateReport', 0);
 Body()(ReportsController.prototype, 'generateReport', 1);
 
-// GET /api/v1/reports/:childId — List reports
+// PATCH /api/v1/reports/approve/:reportId — Approve (CLINICIAN only)
+const approveReportDescriptor = Object.getOwnPropertyDescriptor(
+  ReportsController.prototype,
+  'approveReport',
+);
+Reflect.decorate(
+  [Patch('approve/:reportId'), UseGuards(JwtAuthGuard, RolesGuard), Roles('ROLE_CLINICIAN')],
+  ReportsController.prototype,
+  'approveReport',
+  approveReportDescriptor,
+);
+Param('reportId')(ReportsController.prototype, 'approveReport', 0);
+Req()(ReportsController.prototype, 'approveReport', 1);
+
+// GET /api/v1/reports/:childId — List reports (both roles, filtered by status)
 const listReportsDescriptor = Object.getOwnPropertyDescriptor(
   ReportsController.prototype,
   'listReports',
@@ -153,8 +181,9 @@ Reflect.decorate(
   listReportsDescriptor,
 );
 Param('childId')(ReportsController.prototype, 'listReports', 0);
+Req()(ReportsController.prototype, 'listReports', 1);
 
-// GET /api/v1/reports/detail/:reportId — Single report
+// GET /api/v1/reports/detail/:reportId — Single report (both roles, filtered)
 const getReportDetailDescriptor = Object.getOwnPropertyDescriptor(
   ReportsController.prototype,
   'getReportDetail',
@@ -170,5 +199,6 @@ Reflect.decorate(
   getReportDetailDescriptor,
 );
 Param('reportId')(ReportsController.prototype, 'getReportDetail', 0);
+Req()(ReportsController.prototype, 'getReportDetail', 1);
 
 module.exports = { ReportsController };
