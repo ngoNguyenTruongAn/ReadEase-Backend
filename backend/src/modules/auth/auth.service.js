@@ -47,7 +47,7 @@ class AuthService {
       email: dto.email,
       password_hash,
       display_name: dto.display_name || dto.displayName,
-      role: dto.role || null, // null default instead of ROLE_GUARDIAN before verified
+      role: dto.role || 'ROLE_GUARDIAN', // default to ROLE_GUARDIAN (DB role column is NOT NULL)
       email_verified: false,
       is_active: false,
     });
