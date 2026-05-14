@@ -131,6 +131,7 @@ describe('Intervention Router', () => {
     expect(trigger.data.mode).toBe('DUAL_INTERVENTION');
     expect(trigger.data.state).toBe('REGRESSION');
     expect(trigger.data.confidence).toBe(0.92);
+    expect(trigger.data.wordIndex).toBe(7);
     expect(trigger.data.params.transition.durationMs).toBe(200);
     expect(trigger.data.params.transition.easing).toBe('ease-in-out');
 
@@ -142,11 +143,17 @@ describe('Intervention Router', () => {
   });
 
   it('DISTRACTION → sends adaptation:trigger (VISUAL only)', () => {
-    const result = routeIntervention(mockClient, {
-      state: 'DISTRACTION',
-      confidence: 0.85,
-      session_id: 'sess-2',
-    });
+    const result = routeIntervention(
+      mockClient,
+      {
+        state: 'DISTRACTION',
+        confidence: 0.85,
+        session_id: 'sess-2',
+      },
+      {
+        wordIndex: 11,
+      },
+    );
 
     expect(result).toBe('VISUAL');
     expect(mockClient.send).toHaveBeenCalledTimes(1);
@@ -156,6 +163,7 @@ describe('Intervention Router', () => {
     expect(trigger.data.type).toBe('VISUAL');
     expect(trigger.data.mode).toBe('VISUAL_ONLY');
     expect(trigger.data.state).toBe('DISTRACTION');
+    expect(trigger.data.wordIndex).toBe(11);
     expect(trigger.data.params.transition.durationMs).toBe(200);
     expect(trigger.data.params.transition.easing).toBe('ease-in-out');
   });

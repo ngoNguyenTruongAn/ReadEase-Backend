@@ -20,6 +20,11 @@ const { routeIntervention } = require('./utils/intervention-router');
 const { TokenService } = require('../gamification/gamification.service');
 const { LexicalService } = require('../lexical/lexical.service');
 
+function parsePositiveInt(value, fallback) {
+  const parsed = parseInt(value, 10);
+  return Number.isFinite(parsed) && parsed > 0 ? parsed : fallback;
+}
+
 class TrackingGateway {
   constructor(
     trajectoryBufferService,
@@ -37,6 +42,21 @@ class TrackingGateway {
     this.dataSource = dataSource;
     this.tokenService = tokenService;
     this.lexicalService = lexicalService;
+    this.rollingWindows = new Map();
+    this.lastInterventions = new Map();
+    this.rollingWindowMs = parsePositiveInt(process.env.TRACKING_ROLLING_WINDOW_MS, 2500);
+    this.rollingWindowMaxPoints = parsePositiveInt(
+      process.env.TRACKING_ROLLING_WINDOW_MAX_POINTS,
+      40,
+    );
+    this.rollingWindowMinPoints = parsePositiveInt(
+      process.env.TRACKING_ROLLING_WINDOW_MIN_POINTS,
+      15,
+    );
+    this.interventionCooldownMs = parsePositiveInt(
+      process.env.TRACKING_INTERVENTION_COOLDOWN_MS,
+      800,
+    );
   }
 
   handleConnection(client, request) {
@@ -65,6 +85,54 @@ class TrackingGateway {
     }
   }
 
+  handleDisconnect(client) {
+    if (!client?.session_id) return;
+
+    this.rollingWindows.delete(client.session_id);
+    this.lastInterventions.delete(client.session_id);
+  }
+
+  resetSessionTracking(sessionId) {
+    if (!sessionId) return;
+
+    this.rollingWindows.set(sessionId, []);
+    this.lastInterventions.delete(sessionId);
+  }
+
+  appendToRollingWindow(sessionId, points) {
+    if (!sessionId || !Array.isArray(points) || points.length === 0) {
+      return this.rollingWindows.get(sessionId) || [];
+    }
+
+    const now = Date.now();
+    const normalizedPoints = points.map((point) => {
+      const timestamp = Number(point?.timestamp);
+
+      return {
+        ...point,
+        timestamp: Number.isFinite(timestamp) ? timestamp : now,
+      };
+    });
+
+    const existing = this.rollingWindows.get(sessionId) || [];
+    const merged = existing.concat(normalizedPoints);
+    const latestTimestamp = merged.reduce(
+      (max, point) => Math.max(max, Number(point.timestamp) || 0),
+      0,
+    );
+    const cutoff = latestTimestamp - this.rollingWindowMs;
+
+    let window = merged.filter((point) => Number(point.timestamp) >= cutoff);
+
+    if (window.length > this.rollingWindowMaxPoints) {
+      window = window.slice(-this.rollingWindowMaxPoints);
+    }
+
+    this.rollingWindows.set(sessionId, window);
+
+    return window;
+  }
+
   /* =========================
      SESSION START
   ========================= */
@@ -77,6 +145,7 @@ class TrackingGateway {
         payload?.contentId || payload?.content_id || '11111111-1111-1111-1111-111111111111';
 
       await this.sessionService.ensureSession(client.session_id, client.user_id, contentId);
+      this.resetSessionTracking(client.session_id);
 
       logger.info('Session started', {
         context: 'TrackingGateway',
@@ -123,10 +192,11 @@ class TrackingGateway {
       trajectory_events_received.inc(points.length);
 
       await this.trajectoryBuffer.push(client.session_id, client.user_id, points);
+      const rollingPoints = this.appendToRollingWindow(client.session_id, points);
 
       // ── ML Classification (async, non-blocking) ──
-      if (points.length >= 3) {
-        this.classifyAndRoute(client, points).catch((err) => {
+      if (rollingPoints.length >= this.rollingWindowMinPoints) {
+        this.classifyAndRoute(client, rollingPoints).catch((err) => {
           logger.error('ML classify pipeline error', {
             context: 'TrackingGateway',
             data: { error: err.message, sessionId: client.session_id },
@@ -141,6 +211,47 @@ class TrackingGateway {
     }
 
     end();
+  }
+
+  shouldSuppressIntervention(client, mlResult) {
+    if (!client?.session_id || !['REGRESSION', 'DISTRACTION'].includes(mlResult?.state)) {
+      return false;
+    }
+
+    const previous = this.lastInterventions.get(client.session_id);
+    const now = Date.now();
+
+    return (
+      previous &&
+      previous.state === mlResult.state &&
+      now - previous.timestamp < this.interventionCooldownMs
+    );
+  }
+
+  routeCognitiveState(client, mlResult, lastPoint) {
+    if (this.shouldSuppressIntervention(client, mlResult)) {
+      logger.debug('Intervention suppressed by cooldown', {
+        context: 'TrackingGateway',
+        data: {
+          sessionId: client.session_id,
+          state: mlResult.state,
+          cooldownMs: this.interventionCooldownMs,
+        },
+      });
+
+      return 'SUPPRESSED';
+    }
+
+    const interventionType = routeIntervention(client, mlResult, lastPoint);
+
+    if (interventionType && ['REGRESSION', 'DISTRACTION'].includes(mlResult?.state)) {
+      this.lastInterventions.set(client.session_id, {
+        state: mlResult.state,
+        timestamp: Date.now(),
+      });
+    }
+
+    return interventionType;
   }
 
   /**
@@ -187,7 +298,7 @@ class TrackingGateway {
     }
 
     // Route intervention to client
-    const interventionType = routeIntervention(client, mlResult, lastPoint);
+    const interventionType = this.routeCognitiveState(client, mlResult, lastPoint);
 
     // Store cognitive state event in DB for clinician replay
     await this.replayStorage.storeEvents(client.session_id, [
@@ -202,7 +313,7 @@ class TrackingGateway {
       },
     ]);
 
-    if (interventionType) {
+    if (interventionType && interventionType !== 'SUPPRESSED') {
       logger.info('Intervention sent', {
         context: 'TrackingGateway',
         data: {
@@ -224,6 +335,7 @@ class TrackingGateway {
       if (!client.session_id) return;
 
       await this.trajectoryBuffer.flushSession(client.session_id);
+      this.handleDisconnect(client);
 
       const summary = await this.sessionService.endSession(client.session_id);
       await this.tokenService.earnFromSession(client.user_id, client.session_id);

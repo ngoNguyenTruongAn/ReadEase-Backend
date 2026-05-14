@@ -44,6 +44,7 @@ function routeIntervention(client, mlResult, lastPoint = null) {
             state,
             confidence,
             session_id,
+            wordIndex,
             params: {
               letterSpacing: '0.08em',
               colorBanding: true,
@@ -90,6 +91,7 @@ function routeIntervention(client, mlResult, lastPoint = null) {
             state,
             confidence,
             session_id,
+            wordIndex,
             params: {
               letterSpacing: '0.05em',
               colorBanding: false,
