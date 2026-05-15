@@ -1,4 +1,9 @@
-const { BadRequestException, ConflictException, NotFoundException } = require('@nestjs/common');
+const {
+  BadRequestException,
+  ConflictException,
+  ForbiddenException,
+  NotFoundException,
+} = require('@nestjs/common');
 const { TokenService } = require('../gamification.service');
 
 describe('TokenService', () => {
@@ -204,5 +209,45 @@ describe('TokenService', () => {
       BadRequestException,
     );
     expect(queryRunner.rollbackTransaction).toHaveBeenCalled();
+  });
+
+  it('should set child avatar when reward is in collection', async () => {
+    dataSource.query
+      .mockResolvedValueOnce([{ id: 'child-1', role: 'ROLE_CHILD' }])
+      .mockResolvedValueOnce([
+        {
+          id: 'reward-1',
+          name: 'Sticker',
+          image_url: 'https://cdn.test/sticker.png',
+        },
+      ])
+      .mockResolvedValueOnce(undefined);
+
+    const result = await service.setChildAvatar('child-1', 'reward-1');
+
+    expect(result).toEqual({
+      childId: 'child-1',
+      avatar_reward_id: 'reward-1',
+      avatar_url: 'https://cdn.test/sticker.png',
+      avatar_name: 'Sticker',
+    });
+    expect(dataSource.query.mock.calls[2][0]).toContain('INSERT INTO children_profiles');
+  });
+
+  it('should reject avatar reward that child has not redeemed', async () => {
+    dataSource.query
+      .mockResolvedValueOnce([{ id: 'child-1', role: 'ROLE_CHILD' }])
+      .mockResolvedValueOnce([]);
+
+    await expect(service.setChildAvatar('child-1', 'reward-2')).rejects.toThrow(ForbiddenException);
+  });
+
+  it('should reject avatar update for non-child accounts', async () => {
+    dataSource.query.mockResolvedValueOnce([{ id: 'guardian-1', role: 'ROLE_GUARDIAN' }]);
+
+    await expect(service.setChildAvatar('guardian-1', 'reward-1')).rejects.toThrow(
+      ForbiddenException,
+    );
+    expect(dataSource.query).toHaveBeenCalledTimes(1);
   });
 });

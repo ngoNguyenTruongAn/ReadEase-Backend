@@ -14,6 +14,7 @@ describe('GamificationController', () => {
       getHistory: jest.fn(),
       listActiveRewards: jest.fn(),
       redeemReward: jest.fn(),
+      setChildAvatar: jest.fn(),
     };
 
     controller = new GamificationController(tokenService);
@@ -69,6 +70,35 @@ describe('GamificationController', () => {
       controller.redeemReward(
         '33333333-3333-4333-8333-333333333333',
         { childId: 'not-uuid', expectedVersion: 1 },
+        { user: { sub: '11111111-1111-4111-8111-111111111111', role: 'ROLE_CHILD' } },
+      ),
+    ).rejects.toThrow(BadRequestException);
+  });
+
+  it('should set current child avatar for valid reward payload', async () => {
+    tokenService.setChildAvatar.mockResolvedValue({
+      childId: '11111111-1111-4111-8111-111111111111',
+      avatar_reward_id: '33333333-3333-4333-8333-333333333333',
+      avatar_url: 'https://cdn.test/avatar.png',
+      avatar_name: 'Avatar',
+    });
+
+    const result = await controller.setMyAvatar(
+      { rewardId: '33333333-3333-4333-8333-333333333333' },
+      { user: { sub: '11111111-1111-4111-8111-111111111111', role: 'ROLE_CHILD' } },
+    );
+
+    expect(tokenService.setChildAvatar).toHaveBeenCalledWith(
+      '11111111-1111-4111-8111-111111111111',
+      '33333333-3333-4333-8333-333333333333',
+    );
+    expect(result.avatar_url).toBe('https://cdn.test/avatar.png');
+  });
+
+  it('should validate avatar reward payload', async () => {
+    await expect(
+      controller.setMyAvatar(
+        { rewardId: 'not-uuid' },
         { user: { sub: '11111111-1111-4111-8111-111111111111', role: 'ROLE_CHILD' } },
       ),
     ).rejects.toThrow(BadRequestException);

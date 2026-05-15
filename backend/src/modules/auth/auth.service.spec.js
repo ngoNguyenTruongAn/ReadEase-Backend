@@ -20,6 +20,9 @@ describe('AuthService', () => {
     create: jest.fn(),
     save: jest.fn(),
     remove: jest.fn(),
+    manager: {
+      query: jest.fn(),
+    },
   };
 
   const mockJwt = {
@@ -267,5 +270,29 @@ describe('AuthService', () => {
         newPassword: 'newpass123',
       }),
     ).rejects.toThrow('Old password is incorrect');
+  });
+
+  it('should return child profile with selected avatar fields', async () => {
+    repo.findOne.mockResolvedValue({
+      id: 'child-1',
+      email: 'child@test.com',
+      role: 'ROLE_CHILD',
+      display_name: 'Child',
+      email_verified: true,
+      is_active: true,
+    });
+    repo.manager.query.mockResolvedValue([
+      {
+        avatar_reward_id: 'reward-1',
+        avatar_url: 'https://cdn.test/avatar.png',
+        avatar_name: 'Sticker',
+      },
+    ]);
+
+    const result = await service.getProfile('child-1');
+
+    expect(result.avatar_reward_id).toBe('reward-1');
+    expect(result.avatar_url).toBe('https://cdn.test/avatar.png');
+    expect(result.avatar_name).toBe('Sticker');
   });
 });

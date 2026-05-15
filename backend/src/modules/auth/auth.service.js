@@ -389,7 +389,34 @@ class AuthService {
       throw new NotFoundException('Account not found');
     }
 
-    return user;
+    if (user.role !== 'ROLE_CHILD') {
+      return user;
+    }
+
+    const avatarRows = this.userRepository.manager?.query
+      ? await this.userRepository.manager.query(
+          `
+          SELECT
+            cp.current_avatar_reward_id AS avatar_reward_id,
+            r.name AS avatar_name,
+            r.image_url AS avatar_url
+          FROM children_profiles cp
+          LEFT JOIN rewards r ON r.id = cp.current_avatar_reward_id
+          WHERE cp.user_id = $1
+          LIMIT 1
+          `,
+          [userId],
+        )
+      : [];
+
+    const avatar = avatarRows[0] || {};
+
+    return {
+      ...user,
+      avatar_reward_id: avatar.avatar_reward_id || null,
+      avatar_url: avatar.avatar_url || null,
+      avatar_name: avatar.avatar_name || null,
+    };
   }
 
   // ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
