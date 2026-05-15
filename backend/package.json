@@ -21,6 +21,7 @@
     "migration:run": "npx typeorm migration:run -d src/database/data-source.js",
     "migration:revert": "npx typeorm migration:revert -d src/database/data-source.js",
     "migration:generate": "npx typeorm migration:generate -d src/database/data-source.js",
+    "seed:rewards": "node scripts/seed-rewards.js",
     "test:integration": "node qa/integration/websocket-flow.test.js",
     "test:load": "node qa/load-tests/websocket-tracking.test.js",
     "test:e2e:flow": "node scripts/simulate-e2e-flow.js"
