@@ -6,16 +6,19 @@
  *   2. generateWeeklyReport — fallback when Gemini fails
  *   3. generateWeeklyReport — child not found (404)
  *   4. generateWeeklyReport — duplicate report guard (409)
- *   5. getReportsByChildId — returns list ordered DESC
- *   6. getReportById — found
- *   7. getReportById — not found (404)
- *   8. _aggregateSessionData — correct computation with sessions
- *   9. _aggregateSessionData — zero sessions (empty week)
- *  10. _getCognitiveBreakdown — returns correct counts
- *  11. _getCognitiveBreakdown — empty sessionIds returns zeroes
- *  12. _getCognitiveBreakdown — DB error is non-fatal
- *  13. _getMotorMetrics — returns correct averages
- *  14. _getMotorMetrics — DB error is non-fatal
+ *   5. updateReportContent — updates DRAFT content
+ *   6. updateReportContent — report not found (404)
+ *   7. updateReportContent — approved report cannot be edited (409)
+ *   8. getReportsByChildId — returns list ordered DESC
+ *   9. getReportById — found
+ *  10. getReportById — not found (404)
+ *  11. _aggregateSessionData — correct computation with sessions
+ *  12. _aggregateSessionData — zero sessions (empty week)
+ *  13. _getCognitiveBreakdown — returns correct counts
+ *  14. _getCognitiveBreakdown — empty sessionIds returns zeroes
+ *  15. _getCognitiveBreakdown — DB error is non-fatal
+ *  16. _getMotorMetrics — returns correct averages
+ *  17. _getMotorMetrics — DB error is non-fatal
  *
  * Mocking strategy:
  *   - reportRepository, sessionRepository, contentRepository, userRepository: jest mocks
@@ -232,7 +235,63 @@ describe('ReportsService', () => {
     );
   });
 
-  // ── Test 5: getReportsByChildId ─────────────────────────────────────────
+  // ── Test 5: updateReportContent ─────────────────────────────────────────
+
+  it('should update DRAFT report content', async () => {
+    const reportRepo = makeRepoMock();
+    const existingReport = {
+      id: 'r1',
+      content: '# Original',
+      status: 'DRAFT',
+    };
+    reportRepo.findOne.mockResolvedValue(existingReport);
+
+    const { svc } = buildService({ reportRepo });
+
+    const result = await svc.updateReportContent('r1', '# Edited report');
+
+    expect(reportRepo.findOne).toHaveBeenCalledWith({ where: { id: 'r1' } });
+    expect(reportRepo.save).toHaveBeenCalledWith({
+      id: 'r1',
+      content: '# Edited report',
+      status: 'DRAFT',
+    });
+    expect(result.content).toBe('# Edited report');
+  });
+
+  // ── Test 6: updateReportContent — not found ─────────────────────────────
+
+  it('should throw NotFoundException when updating a nonexistent report', async () => {
+    const reportRepo = makeRepoMock();
+    reportRepo.findOne.mockResolvedValue(null);
+
+    const { svc } = buildService({ reportRepo });
+
+    await expect(svc.updateReportContent('missing-report', '# Edited report')).rejects.toThrow(
+      NotFoundException,
+    );
+    expect(reportRepo.save).not.toHaveBeenCalled();
+  });
+
+  // ── Test 7: updateReportContent — already approved ──────────────────────
+
+  it('should throw ConflictException when updating an approved report', async () => {
+    const reportRepo = makeRepoMock();
+    reportRepo.findOne.mockResolvedValue({
+      id: 'r1',
+      content: '# Final',
+      status: 'APPROVED',
+    });
+
+    const { svc } = buildService({ reportRepo });
+
+    await expect(svc.updateReportContent('r1', '# Edited report')).rejects.toThrow(
+      ConflictException,
+    );
+    expect(reportRepo.save).not.toHaveBeenCalled();
+  });
+
+  // ── Test 8: getReportsByChildId ─────────────────────────────────────────
 
   it('should return list of reports ordered by period_start DESC', async () => {
     const reportRepo = makeRepoMock();
@@ -250,7 +309,7 @@ describe('ReportsService', () => {
     expect(result).toHaveLength(2);
   });
 
-  // ── Test 6: getReportById — found ───────────────────────────────────────
+  // ── Test 9: getReportById — found ───────────────────────────────────────
 
   it('should return a single report by ID', async () => {
     const reportRepo = makeRepoMock();
@@ -264,7 +323,7 @@ describe('ReportsService', () => {
     expect(result.id).toBe('r1');
   });
 
-  // ── Test 7: getReportById — not found ───────────────────────────────────
+  // ── Test 10: getReportById — not found ──────────────────────────────────
 
   it('should throw NotFoundException when report ID does not exist', async () => {
     const reportRepo = makeRepoMock();
@@ -276,7 +335,7 @@ describe('ReportsService', () => {
     await expect(svc.getReportById('nonexistent', mockUser)).rejects.toThrow(NotFoundException);
   });
 
-  // ── Test 8: _aggregateSessionData with sessions ─────────────────────────
+  // ── Test 11: _aggregateSessionData with sessions ────────────────────────
 
   it('should correctly compute aggregated data from sessions', async () => {
     const sessionRepo = makeRepoMock();
@@ -300,7 +359,7 @@ describe('ReportsService', () => {
     expect(result.cognitiveBreakdown).toEqual({ FLUENT: 0, REGRESSION: 0, DISTRACTION: 0 });
   });
 
-  // ── Test 9: _aggregateSessionData with zero sessions ─────────────────
+  // ── Test 12: _aggregateSessionData with zero sessions ───────────────────
 
   it('should return zero values when no sessions exist', async () => {
     const sessionRepo = makeRepoMock();
@@ -317,7 +376,7 @@ describe('ReportsService', () => {
     expect(result.booksRead).toHaveLength(0);
   });
 
-  // ── Test 10: _getCognitiveBreakdown ──────────────────────────────────────
+  // ── Test 13: _getCognitiveBreakdown ─────────────────────────────────────
 
   it('should return correct cognitive state counts from DB', async () => {
     const dataSource = makeDataSourceMock([
@@ -337,7 +396,7 @@ describe('ReportsService', () => {
     );
   });
 
-  // ── Test 11: _getCognitiveBreakdown with empty sessionIds ────────────────
+  // ── Test 14: _getCognitiveBreakdown with empty sessionIds ───────────────
 
   it('should return zeroes when sessionIds is empty', async () => {
     const dataSource = makeDataSourceMock();
@@ -350,7 +409,7 @@ describe('ReportsService', () => {
     expect(dataSource.query).not.toHaveBeenCalled();
   });
 
-  // ── Test 12: _getCognitiveBreakdown DB error is non-fatal ────────────────
+  // ── Test 15: _getCognitiveBreakdown DB error is non-fatal ───────────────
 
   it('should return zeroes when cognitive query fails (non-fatal)', async () => {
     const dataSource = {
@@ -364,7 +423,7 @@ describe('ReportsService', () => {
     expect(result).toEqual({ FLUENT: 0, REGRESSION: 0, DISTRACTION: 0 });
   });
 
-  // ── Test 13: _getMotorMetrics ────────────────────────────────────────────
+  // ── Test 16: _getMotorMetrics ───────────────────────────────────────────
 
   it('should return correct motor averages from DB', async () => {
     const dataSource = makeDataSourceMock([
@@ -380,7 +439,7 @@ describe('ReportsService', () => {
     expect(result.totalEvents).toBe(1200);
   });
 
-  // ── Test 14: _getMotorMetrics DB error is non-fatal ──────────────────────
+  // ── Test 17: _getMotorMetrics DB error is non-fatal ─────────────────────
 
   it('should return defaults when motor query fails (non-fatal)', async () => {
     const dataSource = {

@@ -11,7 +11,6 @@ const {
   NotFoundException,
   ConflictException,
   ForbiddenException,
-  BadRequestException,
 } = require('@nestjs/common');
 const { InjectRepository, InjectDataSource } = require('@nestjs/typeorm');
 const { Between } = require('typeorm');
@@ -127,6 +126,39 @@ class ReportsService {
   }
 
   // ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+  // UPDATE REPORT CONTENT (CLINICIAN)
+  // ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+  /**
+   * Clinician edits the generated Markdown content before approval.
+   * Approved reports are immutable because they may already be visible to guardians.
+   */
+  async updateReportContent(reportId, content) {
+    const report = await this.reportRepository.findOne({
+      where: { id: reportId },
+    });
+
+    if (!report) {
+      throw new NotFoundException(`Report ${reportId} not found`);
+    }
+
+    if (report.status === 'APPROVED') {
+      throw new ConflictException('Approved report content cannot be edited');
+    }
+
+    report.content = content;
+
+    await this.reportRepository.save(report);
+
+    logger.info('Report content updated by clinician', {
+      context: 'ReportsService',
+      data: { reportId, status: report.status },
+    });
+
+    return report;
+  }
+
+  // ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
   // APPROVE REPORT (CLINICIAN)
   // ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
 
@@ -232,14 +264,15 @@ class ReportsService {
     let completedCount = 0;
     const booksMap = new Map(); // Deduplicate books by content_id
     const sessionIds = [];
+    const sessionDetails = [];
 
     for (const session of sessions) {
       sessionIds.push(session.id);
 
       // Calculate reading duration
+      let durationMs = 0;
       if (session.ended_at && session.started_at) {
-        const durationMs =
-          new Date(session.ended_at).getTime() - new Date(session.started_at).getTime();
+        durationMs = new Date(session.ended_at).getTime() - new Date(session.started_at).getTime();
         if (durationMs > 0) {
           totalReadingMs += durationMs;
         }
@@ -263,6 +296,20 @@ class ReportsService {
         });
         totalWords += session.content.word_count || 0;
       }
+
+      const durationMinutes = Math.max(0, Math.round(durationMs / 60000));
+      const wordCount = session.content?.word_count || 0;
+      sessionDetails.push({
+        id: session.id,
+        date: session.started_at ? new Date(session.started_at).toISOString().slice(0, 10) : null,
+        title: session.content?.title || 'Untitled',
+        difficulty: session.content?.difficulty || 'N/A',
+        status: session.status || 'UNKNOWN',
+        durationMinutes,
+        wordCount,
+        wordsPerMinute: durationMinutes > 0 ? Math.round(wordCount / durationMinutes) : 0,
+        effortScore: this._clampScore(effort),
+      });
     }
 
     const totalReadingMinutes = Math.round(totalReadingMs / 60000);
@@ -276,17 +323,81 @@ class ReportsService {
     // ── Motor behaviour metrics from mouse_events ──
     const motorMetrics = await this._getMotorMetrics(sessionIds);
 
+    const sessionCognitiveBreakdown = await this._getCognitiveBreakdownBySession(sessionIds);
+    const sessionMotorMetrics = await this._getMotorMetricsBySession(sessionIds);
+    for (const detail of sessionDetails) {
+      detail.cognitiveBreakdown = sessionCognitiveBreakdown[detail.id] || {
+        FLUENT: 0,
+        REGRESSION: 0,
+        DISTRACTION: 0,
+      };
+      detail.motorMetrics = sessionMotorMetrics[detail.id] || {
+        avgVelocity: 0,
+        avgDwellTime: 0,
+        totalEvents: 0,
+      };
+    }
+
+    const effortImprovement = this._computeEffortImprovement(sessionDetails);
+
     return {
       childName: child.display_name || child.email || 'Học sinh',
       periodStart: weekStart.toISOString().slice(0, 10),
       periodEnd: weekEnd.toISOString().slice(0, 10),
-      totalSessions: completedCount,
+      totalSessions: sessions.length,
+      completedSessions: completedCount,
       totalReadingMinutes,
       averageWordsPerMinute,
-      averageEffortScore,
+      averageEffortScore: this._clampScore(averageEffortScore),
+      effortImprovement,
       booksRead: Array.from(booksMap.values()),
+      sessionDetails,
       cognitiveBreakdown,
       motorMetrics,
+    };
+  }
+
+  _clampScore(value) {
+    const numeric = Number(value);
+    if (!Number.isFinite(numeric)) return 0;
+    if (numeric < 0) return 0;
+    if (numeric > 1) return 1;
+    return Number(numeric.toFixed(4));
+  }
+
+  _computeEffortImprovement(sessionDetails) {
+    if (!sessionDetails || sessionDetails.length < 2) {
+      return {
+        firstEffortScore: sessionDetails?.[0]?.effortScore || 0,
+        lastEffortScore: sessionDetails?.[0]?.effortScore || 0,
+        percentagePointChange: 0,
+        relativePercentChange: 0,
+        direction: 'NO_CHANGE',
+      };
+    }
+
+    const first = this._clampScore(sessionDetails[0].effortScore);
+    const last = this._clampScore(sessionDetails[sessionDetails.length - 1].effortScore);
+    const percentagePointChange = Number(((last - first) * 100).toFixed(1));
+    let relativePercentChange = 0;
+
+    if (first > 0) {
+      relativePercentChange = Number((((last - first) / first) * 100).toFixed(1));
+    } else if (last > 0) {
+      relativePercentChange = 100;
+    }
+
+    return {
+      firstEffortScore: first,
+      lastEffortScore: last,
+      percentagePointChange,
+      relativePercentChange,
+      direction:
+        percentagePointChange > 0
+          ? 'IMPROVED'
+          : percentagePointChange < 0
+            ? 'DECLINED'
+            : 'NO_CHANGE',
     };
   }
 
@@ -325,6 +436,48 @@ class ReportsService {
     }
 
     return breakdown;
+  }
+
+  async _getCognitiveBreakdownBySession(sessionIds) {
+    const breakdownBySession = {};
+
+    if (sessionIds.length === 0) return breakdownBySession;
+
+    try {
+      const rows = await this.dataSource.query(
+        `
+        SELECT session_id, cognitive_state, COUNT(*)::int AS count
+        FROM session_replay_events
+        WHERE session_id = ANY($1)
+          AND cognitive_state IS NOT NULL
+        GROUP BY session_id, cognitive_state
+        `,
+        [sessionIds],
+      );
+
+      if (!Array.isArray(rows)) return breakdownBySession;
+
+      for (const row of rows) {
+        if (!breakdownBySession[row.session_id]) {
+          breakdownBySession[row.session_id] = { FLUENT: 0, REGRESSION: 0, DISTRACTION: 0 };
+        }
+        if (
+          Object.prototype.hasOwnProperty.call(
+            breakdownBySession[row.session_id],
+            row.cognitive_state,
+          )
+        ) {
+          breakdownBySession[row.session_id][row.cognitive_state] = row.count;
+        }
+      }
+    } catch (err) {
+      logger.warn('Failed to fetch per-session cognitive breakdown for report', {
+        context: 'ReportsService',
+        data: { error: err.message, sessionCount: sessionIds.length },
+      });
+    }
+
+    return breakdownBySession;
   }
 
   /**
@@ -366,6 +519,46 @@ class ReportsService {
     }
 
     return defaults;
+  }
+
+  async _getMotorMetricsBySession(sessionIds) {
+    const metricsBySession = {};
+
+    if (sessionIds.length === 0) return metricsBySession;
+
+    try {
+      const rows = await this.dataSource.query(
+        `
+        SELECT
+          session_id,
+          AVG(velocity)::real   AS avg_velocity,
+          AVG(dwell_time)::real AS avg_dwell_time,
+          COUNT(*)::int         AS total_events
+        FROM mouse_events
+        WHERE session_id = ANY($1)
+          AND velocity IS NOT NULL
+        GROUP BY session_id
+        `,
+        [sessionIds],
+      );
+
+      if (!Array.isArray(rows)) return metricsBySession;
+
+      for (const row of rows) {
+        metricsBySession[row.session_id] = {
+          avgVelocity: parseFloat(row.avg_velocity) || 0,
+          avgDwellTime: parseFloat(row.avg_dwell_time) || 0,
+          totalEvents: Number(row.total_events || 0),
+        };
+      }
+    } catch (err) {
+      logger.warn('Failed to fetch per-session motor metrics for report', {
+        context: 'ReportsService',
+        data: { error: err.message, sessionCount: sessionIds.length },
+      });
+    }
+
+    return metricsBySession;
   }
 }
 

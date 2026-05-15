@@ -232,6 +232,16 @@ class GeminiService {
    * Follows Google Prompting Guide 101: Persona → Task → Context → Format.
    */
   _buildPrompt(data) {
+    const sessionRows =
+      data.sessionDetails && data.sessionDetails.length > 0
+        ? data.sessionDetails
+            .map(
+              (s, i) =>
+                `| ${i + 1} | ${s.date || 'N/A'} | ${s.title} | ${s.difficulty} | ${s.status} | ${s.durationMinutes} phút | ${s.wordCount} | ${s.wordsPerMinute} | ${(s.effortScore * 100).toFixed(0)}% |`,
+            )
+            .join('\n')
+        : '| - | - | Chưa có phiên đọc | - | - | 0 phút | 0 | 0 | 0% |';
+
     const booksList =
       data.booksRead.length > 0
         ? data.booksRead
@@ -245,12 +255,17 @@ class GeminiService {
     // Cognitive state breakdown (from session_replay_events)
     const cog = data.cognitiveBreakdown || { FLUENT: 0, REGRESSION: 0, DISTRACTION: 0 };
     const cogTotal = cog.FLUENT + cog.REGRESSION + cog.DISTRACTION;
+    const fluentPercent = cogTotal > 0 ? ((cog.FLUENT / cogTotal) * 100).toFixed(0) : '0';
+    const regressionPercent = cogTotal > 0 ? ((cog.REGRESSION / cogTotal) * 100).toFixed(0) : '0';
+    const distractionPercent = cogTotal > 0 ? ((cog.DISTRACTION / cogTotal) * 100).toFixed(0) : '0';
     const cogSection =
       cogTotal > 0
         ? `### Cognitive State Analysis (ML-classified)
-- **Fluent Reading Events**: ${cog.FLUENT} (${((cog.FLUENT / cogTotal) * 100).toFixed(0)}%)
-- **Regression / Re-reading Events**: ${cog.REGRESSION} (${((cog.REGRESSION / cogTotal) * 100).toFixed(0)}%)
-- **Distraction Events**: ${cog.DISTRACTION} (${((cog.DISTRACTION / cogTotal) * 100).toFixed(0)}%)
+| Trạng thái | Số lần | Tỷ lệ |
+|---|---|---|
+| Đọc trôi chảy (Fluent) | ${cog.FLUENT} | ${fluentPercent}% |
+| Đọc lại (Regression) | ${cog.REGRESSION} | ${regressionPercent}% |
+| Mất tập trung (Distraction) | ${cog.DISTRACTION} | ${distractionPercent}% |
 - **Interpretation**: ${cog.REGRESSION > cog.FLUENT ? 'Child shows frequent re-reading — may indicate word decoding difficulty.' : 'Reading flow is mostly fluent — positive indicator.'}`
         : '### Cognitive State Analysis\n- No cognitive tracking data available for this period.';
 
@@ -264,6 +279,20 @@ class GeminiService {
 - **Total Tracking Events**: ${motor.totalEvents}`
         : '';
 
+    const improvement = data.effortImprovement || {
+      firstEffortScore: 0,
+      lastEffortScore: 0,
+      percentagePointChange: 0,
+      relativePercentChange: 0,
+      direction: 'NO_CHANGE',
+    };
+    const improvementLabel =
+      improvement.direction === 'IMPROVED'
+        ? 'Cải thiện'
+        : improvement.direction === 'DECLINED'
+          ? 'Giảm'
+          : 'Không đổi';
+
     return `You are **ReadEase AI**, an educational reporting assistant specialising in children with Dyslexia (ages 6-12). You generate weekly progress reports for parents and guardians.
 
 ### Child Information
@@ -272,9 +301,20 @@ class GeminiService {
 
 ### Reading Statistics This Week
 - **Total Reading Sessions**: ${data.totalSessions}
+- **Completed Sessions**: ${data.completedSessions || 0}
 - **Total Reading Time**: ${data.totalReadingMinutes} minutes
 - **Average Reading Speed**: ${data.averageWordsPerMinute} words/minute
 - **Average Effort Score**: ${(data.averageEffortScore * 100).toFixed(0)}%
+
+### All Reading Sessions This Week
+| # | Ngày | Truyện | Độ khó | Trạng thái | Thời lượng | Số từ | Tốc độ (từ/phút) | Effort |
+|---|---|---|---|---|---:|---:|---:|---:|
+${sessionRows}
+
+### Improvement
+- **First Session Effort**: ${(improvement.firstEffortScore * 100).toFixed(0)}%
+- **Last Session Effort**: ${(improvement.lastEffortScore * 100).toFixed(0)}%
+- **Change**: ${improvementLabel} ${Math.abs(improvement.percentagePointChange).toFixed(1)} điểm phần trăm (${Math.abs(improvement.relativePercentChange).toFixed(1)}%)
 
 ### Books / Content Read
 ${booksList}
@@ -287,13 +327,19 @@ ${motorSection}
 1. Write in **Markdown** format.
 2. Use a warm, encouraging, and professional tone suitable for Vietnamese parents.
 3. Start with a greeting and a 2-sentence overall summary.
-4. Include a "Thành tích tuần này" (Achievements) section highlighting positives.
-5. Include a "Phân tích hành vi đọc" (Reading Behaviour Analysis) section that interprets the cognitive state and motor data above in parent-friendly language — do NOT use raw numbers, translate them into observations (e.g., "Bé có xu hướng đọc lại một số từ khó" instead of "REGRESSION: 30%").
-6. If the effort score is below 50% or regressions exceed 40%, provide a "Gợi ý cải thiện" section with 2-3 gentle, actionable suggestions.
-7. End with motivational words for both the child and the parent.
-8. Keep the report between 250-400 words.
-9. Do NOT include any clinical Dyslexia diagnosis terminology or medical advice.
-10. Write the entire report in **Vietnamese** language.
+4. Include a "Tổng quan số liệu" section.
+5. Include a "Chi tiết từng phiên đọc trong tuần" section and preserve the session table with all rows.
+6. Include a "Mức cải thiện" section using the improvement numbers above.
+7. Include a "Phân tích trạng thái đọc" section and preserve this exact table format:
+| Trạng thái | Số lần | Tỷ lệ |
+|---|---|---|
+| Đọc trôi chảy (Fluent) | <n> | <n>% |
+| Đọc lại (Regression) | <n> | <n>% |
+| Mất tập trung (Distraction) | <n> | <n>% |
+8. Include a "Nhận xét và gợi ý" section with 2-3 gentle, actionable suggestions.
+9. End with motivational words for both the child and the parent.
+10. Do NOT include any clinical Dyslexia diagnosis terminology or medical advice.
+11. Write the entire report in **Vietnamese** language.
 
 Generate the report now:`.trim();
   }
@@ -307,6 +353,16 @@ Generate the report now:`.trim();
    * Used when the API key is missing or the API fails.
    */
   _buildFallbackReport(data) {
+    const sessionRows =
+      data.sessionDetails && data.sessionDetails.length > 0
+        ? data.sessionDetails
+            .map(
+              (s, i) =>
+                `| ${i + 1} | ${s.date || 'N/A'} | ${s.title} | ${s.difficulty} | ${s.status} | ${s.durationMinutes} phút | ${s.wordCount} | ${s.wordsPerMinute} | ${(s.effortScore * 100).toFixed(0)}% |`,
+            )
+            .join('\n')
+        : '| - | - | Chưa có phiên đọc | - | - | 0 phút | 0 | 0 | 0% |';
+
     const booksList =
       data.booksRead.length > 0
         ? data.booksRead
@@ -315,20 +371,34 @@ Generate the report now:`.trim();
         : '- _Chưa có nội dung nào được hoàn thành trong tuần này._';
 
     const effortPercent = (data.averageEffortScore * 100).toFixed(0);
+    const improvement = data.effortImprovement || {
+      firstEffortScore: 0,
+      lastEffortScore: 0,
+      percentagePointChange: 0,
+      relativePercentChange: 0,
+      direction: 'NO_CHANGE',
+    };
+    const improvementLabel =
+      improvement.direction === 'IMPROVED'
+        ? 'cải thiện'
+        : improvement.direction === 'DECLINED'
+          ? 'giảm'
+          : 'không thay đổi';
 
     // Cognitive state summary for fallback
     const cog = data.cognitiveBreakdown || { FLUENT: 0, REGRESSION: 0, DISTRACTION: 0 };
     const cogTotal = cog.FLUENT + cog.REGRESSION + cog.DISTRACTION;
-    const cogSection =
-      cogTotal > 0
-        ? `## 🧠 Phân Tích Hành Vi Đọc
+    const fluentPercent = cogTotal > 0 ? ((cog.FLUENT / cogTotal) * 100).toFixed(0) : '0';
+    const regressionPercent = cogTotal > 0 ? ((cog.REGRESSION / cogTotal) * 100).toFixed(0) : '0';
+    const distractionPercent = cogTotal > 0 ? ((cog.DISTRACTION / cogTotal) * 100).toFixed(0) : '0';
+
+    const cogSection = `## 🧠 Phân Tích Trạng Thái Đọc
 
 | Trạng thái | Số lần | Tỷ lệ |
 |---|---|---|
-| Đọc trôi chảy (Fluent) | ${cog.FLUENT} | ${((cog.FLUENT / cogTotal) * 100).toFixed(0)}% |
-| Đọc lại (Regression) | ${cog.REGRESSION} | ${((cog.REGRESSION / cogTotal) * 100).toFixed(0)}% |
-| Mất tập trung (Distraction) | ${cog.DISTRACTION} | ${((cog.DISTRACTION / cogTotal) * 100).toFixed(0)}% |`
-        : '';
+| Đọc trôi chảy (Fluent) | ${cog.FLUENT} | ${fluentPercent}% |
+| Đọc lại (Regression) | ${cog.REGRESSION} | ${regressionPercent}% |
+| Mất tập trung (Distraction) | ${cog.DISTRACTION} | ${distractionPercent}% |`;
 
     return `# 📖 Báo Cáo Tiến Độ Đọc Hàng Tuần
 
@@ -342,9 +412,24 @@ Generate the report now:`.trim();
 | Chỉ số | Giá trị |
 |---|---|
 | Tổng phiên đọc | ${data.totalSessions} phiên |
+| Phiên đã hoàn thành | ${data.completedSessions || 0} phiên |
 | Tổng thời gian đọc | ${data.totalReadingMinutes} phút |
 | Tốc độ đọc trung bình | ${data.averageWordsPerMinute} từ/phút |
 | Điểm nỗ lực trung bình | ${effortPercent}% |
+
+## 🗂️ Chi Tiết Từng Phiên Đọc Trong Tuần
+
+| # | Ngày | Truyện | Độ khó | Trạng thái | Thời lượng | Số từ | Tốc độ (từ/phút) | Effort |
+|---|---|---|---|---|---:|---:|---:|---:|
+${sessionRows}
+
+## 📈 Mức Cải Thiện
+
+| Chỉ số | Giá trị |
+|---|---|
+| Effort phiên đầu | ${(improvement.firstEffortScore * 100).toFixed(0)}% |
+| Effort phiên cuối | ${(improvement.lastEffortScore * 100).toFixed(0)}% |
+| Thay đổi | ${improvementLabel} ${Math.abs(improvement.percentagePointChange).toFixed(1)} điểm phần trăm (${Math.abs(improvement.relativePercentChange).toFixed(1)}%) |
 
 ## 📚 Nội Dung Đã Đọc
 ${booksList}

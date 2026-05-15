@@ -10,6 +10,7 @@
  *
  * Endpoints:
  *   POST   /api/v1/reports/generate/:childId     — Generate (CLINICIAN only)
+ *   PATCH  /api/v1/reports/:reportId/content     — Edit content (CLINICIAN only)
  *   PATCH  /api/v1/reports/approve/:reportId      — Approve  (CLINICIAN only)
  *   GET    /api/v1/reports/:childId               — List reports
  *   GET    /api/v1/reports/detail/:reportId        — Get single report
@@ -31,6 +32,7 @@ const {
 } = require('@nestjs/common');
 
 const { ReportsService } = require('./reports.service');
+const UpdateReportContentDto = require('./dto/update-report-content.dto');
 const { JwtAuthGuard } = require('../auth/guards/jwt-auth.guard');
 const { RolesGuard } = require('../auth/guards/roles.guard');
 const { Roles } = require('../auth/decorators/roles.decorator');
@@ -53,6 +55,27 @@ class ReportsController {
 
     return {
       message: 'Report generated as DRAFT. Please review and approve to send to guardian.',
+      data: report,
+    };
+  }
+
+  /**
+   * PATCH /api/v1/reports/:reportId/content
+   *
+   * Clinician edits report Markdown content while the report is still DRAFT.
+   */
+  async updateReportContent(reportId, body) {
+    const { error, value } = UpdateReportContentDto.schema.validate(body);
+
+    if (error) {
+      throw new BadRequestException(error.details[0].message);
+    }
+
+    const report = await this.reportsService.updateReportContent(reportId, value.content);
+
+    return {
+      message:
+        'Report content updated successfully. Please review and approve to send to guardian.',
       data: report,
     };
   }
@@ -154,6 +177,20 @@ Reflect.decorate(
 );
 Param('childId')(ReportsController.prototype, 'generateReport', 0);
 Body()(ReportsController.prototype, 'generateReport', 1);
+
+// PATCH /api/v1/reports/:reportId/content — Edit content (CLINICIAN only)
+const updateReportContentDescriptor = Object.getOwnPropertyDescriptor(
+  ReportsController.prototype,
+  'updateReportContent',
+);
+Reflect.decorate(
+  [Patch(':reportId/content'), UseGuards(JwtAuthGuard, RolesGuard), Roles('ROLE_CLINICIAN')],
+  ReportsController.prototype,
+  'updateReportContent',
+  updateReportContentDescriptor,
+);
+Param('reportId')(ReportsController.prototype, 'updateReportContent', 0);
+Body()(ReportsController.prototype, 'updateReportContent', 1);
 
 // PATCH /api/v1/reports/approve/:reportId — Approve (CLINICIAN only)
 const approveReportDescriptor = Object.getOwnPropertyDescriptor(
