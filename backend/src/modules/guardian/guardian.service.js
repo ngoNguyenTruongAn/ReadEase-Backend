@@ -11,11 +11,17 @@ const {
 const { ConfigService } = require('@nestjs/config');
 const { InjectDataSource } = require('@nestjs/typeorm');
 const { logger } = require('../../common/logger/winston.config');
+const { OtpService } = require('../auth/services/otp.service');
+const { EmailService } = require('../auth/services/email.service');
+
+const ERASE_CHILD_DATA_OTP_TYPE = 'ERASE_CHILD_DATA';
 
 class GuardianService {
-  constructor(dataSource, configService) {
+  constructor(dataSource, configService, otpService, emailService) {
     this.dataSource = dataSource;
     this.configService = configService;
+    this.otpService = otpService;
+    this.emailService = emailService;
   }
 
   async listChildren(guardianId) {
@@ -243,6 +249,50 @@ class GuardianService {
     }
 
     return rows[0];
+  }
+
+  getEraseOtpType(childId) {
+    return `${ERASE_CHILD_DATA_OTP_TYPE}:${childId}`;
+  }
+
+  async getGuardianEmail(executor, guardianId) {
+    const rows = await executor.query(
+      `
+      SELECT email
+      FROM users
+      WHERE id = $1
+        AND role = 'ROLE_GUARDIAN'
+        AND deleted_at IS NULL
+      LIMIT 1
+      `,
+      [guardianId],
+    );
+
+    if (rows.length === 0) {
+      throw new NotFoundException('Guardian account not found');
+    }
+
+    return rows[0].email;
+  }
+
+  async requestEraseOtp(guardianId, childId) {
+    await this.verifyGuardianship(this.dataSource, guardianId, childId);
+    const guardianEmail = await this.getGuardianEmail(this.dataSource, guardianId);
+
+    const otpType = this.getEraseOtpType(childId);
+    const code = await this.otpService.createOTP(guardianId, otpType);
+    await this.emailService.sendOTP(guardianEmail, code, ERASE_CHILD_DATA_OTP_TYPE);
+
+    logger.info('Guardian child erase OTP sent', {
+      context: 'GuardianService',
+      data: { guardianId, childId },
+    });
+
+    return {
+      message: 'OTP has been sent to your email. Use it to confirm child data erasure.',
+      childId,
+      email: guardianEmail,
+    };
   }
 
   async exportChildData(guardianId, childId, confirmationToken) {
@@ -493,15 +543,14 @@ class GuardianService {
     }
   }
 
-  async eraseChildData(guardianId, childId, confirmationToken) {
-    this.verifyConfirmationToken('erase', confirmationToken);
-
+  async eraseChildData(guardianId, childId, otpCode) {
     const queryRunner = this.dataSource.createQueryRunner();
     await queryRunner.connect();
     await queryRunner.startTransaction();
 
     try {
       await this.verifyGuardianship(queryRunner.manager, guardianId, childId);
+      await this.otpService.verifyOTP(guardianId, otpCode, this.getEraseOtpType(childId));
 
       const deletedCounts = await this.collectChildDataCounts(queryRunner.manager, childId);
 
@@ -588,6 +637,8 @@ class GuardianService {
 
 InjectDataSource()(GuardianService, undefined, 0);
 Inject(ConfigService)(GuardianService, undefined, 1);
+Inject(OtpService)(GuardianService, undefined, 2);
+Inject(EmailService)(GuardianService, undefined, 3);
 Injectable()(GuardianService);
 
 module.exports = { GuardianService };

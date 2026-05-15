@@ -14,7 +14,7 @@
  *   OTP_COOLDOWN_SEC  = 60    (minimum seconds between resend requests)
  *   OTP_MAX_ATTEMPTS  = 5     (failed attempts before lock)
  */
-const { Injectable, Inject, BadRequestException } = require('@nestjs/common');
+const { Injectable, BadRequestException } = require('@nestjs/common');
 const { HttpException, HttpStatus } = require('@nestjs/common');
 const { logger } = require('../../../common/logger/winston.config');
 
@@ -62,7 +62,7 @@ class OtpService {
    * Throws 429 if the user requests another OTP within the cooldown window.
    *
    * @param {string} userId
-   * @param {'EMAIL_VERIFY'|'FORGOT_PASSWORD'} type
+   * @param {string} type
    * @returns {Promise<string>} the generated OTP code (passed to EmailService)
    */
   async createOTP(userId, type) {
@@ -106,7 +106,7 @@ class OtpService {
    *
    * @param {string} userId
    * @param {string} code   – value submitted by the user
-   * @param {'EMAIL_VERIFY'|'FORGOT_PASSWORD'} type
+   * @param {string} type
    * @returns {Promise<true>}
    */
   async verifyOTP(userId, code, type) {

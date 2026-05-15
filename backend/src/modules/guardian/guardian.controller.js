@@ -29,7 +29,7 @@ class GuardianController {
     this.guardianService = guardianService;
   }
 
-  validateRequest(childId, body) {
+  validateParams(childId) {
     const { error: paramsError, value: paramsValue } = GuardianDataActionDto.paramsSchema.validate({
       childId,
     });
@@ -37,19 +37,39 @@ class GuardianController {
       throw new BadRequestException(paramsError.details[0].message);
     }
 
-    const { error: bodyError, value: bodyValue } = GuardianDataActionDto.bodySchema.validate(body);
+    return paramsValue.childId;
+  }
+
+  validateExportRequest(childId, body) {
+    const validatedChildId = this.validateParams(childId);
+    const { error: bodyError, value: bodyValue } =
+      GuardianDataActionDto.exportBodySchema.validate(body);
     if (bodyError) {
       throw new BadRequestException(bodyError.details[0].message);
     }
 
     return {
-      childId: paramsValue.childId,
+      childId: validatedChildId,
       confirmationToken: bodyValue.confirmationToken,
     };
   }
 
+  validateEraseRequest(childId, body) {
+    const validatedChildId = this.validateParams(childId);
+    const { error: bodyError, value: bodyValue } =
+      GuardianDataActionDto.eraseBodySchema.validate(body);
+    if (bodyError) {
+      throw new BadRequestException(bodyError.details[0].message);
+    }
+
+    return {
+      childId: validatedChildId,
+      otpCode: bodyValue.otpCode,
+    };
+  }
+
   async exportChildData(childId, body, req) {
-    const validated = this.validateRequest(childId, body);
+    const validated = this.validateExportRequest(childId, body);
     return this.guardianService.exportChildData(
       req.user.sub,
       validated.childId,
@@ -57,13 +77,14 @@ class GuardianController {
     );
   }
 
+  async requestEraseOtp(childId, req) {
+    const validatedChildId = this.validateParams(childId);
+    return this.guardianService.requestEraseOtp(req.user.sub, validatedChildId);
+  }
+
   async eraseChildData(childId, body, req) {
-    const validated = this.validateRequest(childId, body);
-    return this.guardianService.eraseChildData(
-      req.user.sub,
-      validated.childId,
-      validated.confirmationToken,
-    );
+    const validated = this.validateEraseRequest(childId, body);
+    return this.guardianService.eraseChildData(req.user.sub, validated.childId, validated.otpCode);
   }
 
   async listChildren(req) {
@@ -110,6 +131,26 @@ const eraseDescriptor = Object.getOwnPropertyDescriptor(
   GuardianController.prototype,
   'eraseChildData',
 );
+
+const requestEraseOtpDescriptor = Object.getOwnPropertyDescriptor(
+  GuardianController.prototype,
+  'requestEraseOtp',
+);
+Reflect.decorate(
+  [
+    Post(':childId/erase/otp'),
+    HttpCode(200),
+    UseGuards(JwtAuthGuard, RolesGuard, GuardianThrottlerGuard),
+    Roles('ROLE_GUARDIAN'),
+    Throttle({ default: { limit: 1, ttl: 60000 } }),
+  ],
+  GuardianController.prototype,
+  'requestEraseOtp',
+  requestEraseOtpDescriptor,
+);
+Param('childId')(GuardianController.prototype, 'requestEraseOtp', 0);
+Req()(GuardianController.prototype, 'requestEraseOtp', 1);
+
 Reflect.decorate(
   [
     Delete(':childId/erase'),
