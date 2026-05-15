@@ -123,6 +123,28 @@ class GuardianService {
     return rows;
   }
 
+  async listGuardiansForChild(childId) {
+    const rows = await this.dataSource.query(
+      `
+      SELECT
+        g.id,
+        g.email,
+        g.display_name,
+        gc.consent_given_at,
+        gc.consent_type
+      FROM guardian_children gc
+      JOIN users g ON gc.guardian_id = g.id
+      WHERE gc.child_id = $1
+        AND g.role = 'ROLE_GUARDIAN'
+        AND g.deleted_at IS NULL
+      ORDER BY gc.consent_given_at DESC
+      `,
+      [childId],
+    );
+
+    return rows;
+  }
+
   async linkChild(guardianId, inviteCode) {
     const queryRunner = this.dataSource.createQueryRunner();
     await queryRunner.connect();

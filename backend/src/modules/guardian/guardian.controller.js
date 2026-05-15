@@ -74,6 +74,10 @@ class GuardianController {
     return this.guardianService.listAllChildren(req.user);
   }
 
+  async listMyGuardians(req) {
+    return this.guardianService.listGuardiansForChild(req.user.sub);
+  }
+
   async linkChild(body, req) {
     const { error, value } = LinkChildDto.schema.validate(body);
     if (error) {
@@ -156,6 +160,23 @@ Reflect.decorate(
   listAllChildrenDescriptor,
 );
 Req()(GuardianController.prototype, 'listAllChildren', 0);
+
+const listMyGuardiansDescriptor = Object.getOwnPropertyDescriptor(
+  GuardianController.prototype,
+  'listMyGuardians',
+);
+Reflect.decorate(
+  [
+    Get('my-guardians'),
+    HttpCode(200),
+    UseGuards(JwtAuthGuard, RolesGuard),
+    Roles('ROLE_CHILD'),
+  ],
+  GuardianController.prototype,
+  'listMyGuardians',
+  listMyGuardiansDescriptor,
+);
+Req()(GuardianController.prototype, 'listMyGuardians', 0);
 
 const linkChildDescriptor = Object.getOwnPropertyDescriptor(
   GuardianController.prototype,
