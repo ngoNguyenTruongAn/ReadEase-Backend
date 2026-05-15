@@ -30,6 +30,10 @@ const ChildrenProfileEntity = new EntitySchema({
       nullable: true,
       default: () => "'{}'",
     },
+    current_avatar_reward_id: {
+      type: 'uuid',
+      nullable: true,
+    },
     created_at: {
       type: 'timestamptz',
       createDate: true,
@@ -45,6 +49,13 @@ const ChildrenProfileEntity = new EntitySchema({
       target: 'User',
       joinColumn: { name: 'user_id' },
       onDelete: 'CASCADE',
+    },
+    currentAvatarReward: {
+      type: 'many-to-one',
+      target: 'Reward',
+      joinColumn: { name: 'current_avatar_reward_id' },
+      nullable: true,
+      onDelete: 'SET NULL',
     },
   },
 });

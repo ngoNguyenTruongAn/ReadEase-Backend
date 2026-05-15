@@ -4,6 +4,7 @@ const {
   Controller,
   Get,
   Post,
+  Patch,
   Put,
   Delete,
   Param,
@@ -26,6 +27,7 @@ const HistoryQueryDto = require('./dto/history-query.dto');
 const CreateRewardDto = require('./dto/create-reward.dto');
 const UpdateRewardDto = require('./dto/update-reward.dto');
 const RedeemRewardDto = require('./dto/redeem-reward.dto');
+const SetAvatarDto = require('./dto/set-avatar.dto');
 
 class GamificationController {
   constructor(tokenService) {
@@ -117,6 +119,16 @@ class GamificationController {
     this.validateChildId(childId);
     this.assertChildAccess(childId, req.user);
     return this.tokenService.getCollection(childId);
+  }
+
+  async setMyAvatar(body, req) {
+    const { error, value } = SetAvatarDto.schema.validate(body);
+    if (error) {
+      throw new BadRequestException(error.details[0].message);
+    }
+
+    this.validateChildId(value.rewardId);
+    return this.tokenService.setChildAvatar(req.user.sub, value.rewardId);
   }
 }
 
@@ -249,5 +261,19 @@ Reflect.decorate(
 );
 Param('childId')(GamificationController.prototype, 'getCollection', 0);
 Req()(GamificationController.prototype, 'getCollection', 1);
+
+// ── PATCH /children/me/avatar (Protected: ROLE_CHILD) — Set current avatar ──
+const setMyAvatarDescriptor = Object.getOwnPropertyDescriptor(
+  GamificationController.prototype,
+  'setMyAvatar',
+);
+Reflect.decorate(
+  [Patch('children/me/avatar'), UseGuards(JwtAuthGuard, RolesGuard), Roles('ROLE_CHILD')],
+  GamificationController.prototype,
+  'setMyAvatar',
+  setMyAvatarDescriptor,
+);
+Body()(GamificationController.prototype, 'setMyAvatar', 0);
+Req()(GamificationController.prototype, 'setMyAvatar', 1);
 
 module.exports = { GamificationController };

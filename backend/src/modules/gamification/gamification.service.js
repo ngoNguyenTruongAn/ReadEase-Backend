@@ -2,6 +2,7 @@ const {
   Injectable,
   BadRequestException,
   ConflictException,
+  ForbiddenException,
   NotFoundException,
 } = require('@nestjs/common');
 const { InjectDataSource } = require('@nestjs/typeorm');
@@ -467,6 +468,64 @@ class TokenService {
       totalItems: rows.reduce((sum, row) => sum + Number(row.quantity), 0),
       uniqueItems: rows.length,
       items: rows,
+    };
+  }
+
+  async setChildAvatar(childId, rewardId) {
+    const childRows = await this.dataSource.query(
+      `
+      SELECT id, role
+      FROM users
+      WHERE id = $1
+      LIMIT 1
+      `,
+      [childId],
+    );
+
+    if (childRows.length === 0) {
+      throw new NotFoundException('Child not found');
+    }
+
+    if (childRows[0].role !== 'ROLE_CHILD') {
+      throw new ForbiddenException('Only child accounts can set an avatar');
+    }
+
+    const rewardRows = await this.dataSource.query(
+      `
+      SELECT r.id, r.name, r.image_url
+      FROM redemptions rd
+      JOIN rewards r ON r.id = rd.reward_id
+      WHERE rd.child_id = $1
+        AND rd.reward_id = $2
+      ORDER BY rd.redeemed_at DESC
+      LIMIT 1
+      `,
+      [childId, rewardId],
+    );
+
+    if (rewardRows.length === 0) {
+      throw new ForbiddenException('Avatar reward must be in the child collection');
+    }
+
+    await this.dataSource.query(
+      `
+      INSERT INTO children_profiles (user_id, preferences, current_avatar_reward_id)
+      VALUES ($1, '{}'::jsonb, $2)
+      ON CONFLICT (user_id)
+      DO UPDATE SET
+        current_avatar_reward_id = EXCLUDED.current_avatar_reward_id,
+        updated_at = NOW()
+      `,
+      [childId, rewardId],
+    );
+
+    const reward = rewardRows[0];
+
+    return {
+      childId,
+      avatar_reward_id: reward.id,
+      avatar_url: reward.image_url || null,
+      avatar_name: reward.name || null,
     };
   }
 }
