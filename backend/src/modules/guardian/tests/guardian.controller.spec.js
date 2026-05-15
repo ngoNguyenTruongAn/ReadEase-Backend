@@ -21,6 +21,7 @@ describe('GuardianController', () => {
       exportChildData: jest.fn(),
       requestEraseOtp: jest.fn(),
       eraseChildData: jest.fn(),
+      listGuardiansForChild: jest.fn(),
     };
 
     controller = new GuardianController(guardianService);
@@ -78,6 +79,30 @@ describe('GuardianController', () => {
 
     expect(result.childId).toBe(childId);
     expect(guardianService.requestEraseOtp).toHaveBeenCalledWith(guardianId, childId);
+  });
+
+  it('should attach child role on my guardians route', () => {
+    const guards = Reflect.getMetadata(
+      GUARDS_METADATA,
+      GuardianController.prototype.listMyGuardians,
+    );
+    const roles = Reflect.getMetadata('roles', GuardianController.prototype.listMyGuardians);
+
+    expect(guards).toEqual([JwtAuthGuard, RolesGuard]);
+    expect(roles).toEqual(['ROLE_CHILD']);
+  });
+
+  it('should list guardians for current child', async () => {
+    guardianService.listGuardiansForChild.mockResolvedValue([
+      { id: guardianId, display_name: 'Guardian A' },
+    ]);
+
+    const result = await controller.listMyGuardians({
+      user: { sub: childId, role: 'ROLE_CHILD' },
+    });
+
+    expect(result).toEqual([{ id: guardianId, display_name: 'Guardian A' }]);
+    expect(guardianService.listGuardiansForChild).toHaveBeenCalledWith(childId);
   });
 
   it('should export child data for valid request', async () => {

@@ -57,6 +57,33 @@ describe('GuardianService', () => {
     jest.clearAllMocks();
   });
 
+  it('should list guardians linked to a child', async () => {
+    dataSource.query.mockResolvedValueOnce([
+      {
+        id: guardianId,
+        email: 'guardian@test.com',
+        display_name: 'Guardian A',
+        consent_given_at: '2026-03-01T00:00:00.000Z',
+        consent_type: 'COPPA_PARENTAL',
+      },
+    ]);
+
+    const result = await service.listGuardiansForChild(childId);
+
+    expect(result).toEqual([
+      {
+        id: guardianId,
+        email: 'guardian@test.com',
+        display_name: 'Guardian A',
+        consent_given_at: '2026-03-01T00:00:00.000Z',
+        consent_type: 'COPPA_PARENTAL',
+      },
+    ]);
+    expect(dataSource.query).toHaveBeenCalledWith(expect.stringContaining('guardian_children'), [
+      childId,
+    ]);
+  });
+
   it('should export complete child data when guardian relationship and token are valid', async () => {
     dataSource.query
       .mockResolvedValueOnce([
