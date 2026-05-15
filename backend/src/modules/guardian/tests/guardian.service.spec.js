@@ -5,6 +5,8 @@ describe('GuardianService', () => {
   let service;
   let dataSource;
   let configService;
+  let otpService;
+  let emailService;
   let queryRunner;
 
   const guardianId = '11111111-1111-4111-8111-111111111111';
@@ -39,7 +41,16 @@ describe('GuardianService', () => {
       }),
     };
 
-    service = new GuardianService(dataSource, configService);
+    otpService = {
+      createOTP: jest.fn().mockResolvedValue('123456'),
+      verifyOTP: jest.fn().mockResolvedValue(true),
+    };
+
+    emailService = {
+      sendOTP: jest.fn().mockResolvedValue(undefined),
+    };
+
+    service = new GuardianService(dataSource, configService, otpService, emailService);
   });
 
   afterEach(() => {
@@ -122,6 +133,23 @@ describe('GuardianService', () => {
       UnauthorizedException,
     );
     expect(dataSource.query).not.toHaveBeenCalled();
+  });
+
+  it('should send erase OTP to the guardian email after verifying guardianship', async () => {
+    dataSource.query
+      .mockResolvedValueOnce([{ guardian_id: guardianId, child_id: childId }])
+      .mockResolvedValueOnce([{ email: 'guardian@test.com' }]);
+
+    const result = await service.requestEraseOtp(guardianId, childId);
+
+    expect(result.childId).toBe(childId);
+    expect(result.email).toBe('guardian@test.com');
+    expect(otpService.createOTP).toHaveBeenCalledWith(guardianId, `ERASE_CHILD_DATA:${childId}`);
+    expect(emailService.sendOTP).toHaveBeenCalledWith(
+      'guardian@test.com',
+      '123456',
+      'ERASE_CHILD_DATA',
+    );
   });
 
   it('should erase all child data with cascade-safe order and verify zero residual records', async () => {
@@ -209,7 +237,7 @@ describe('GuardianService', () => {
       return [];
     });
 
-    const result = await service.eraseChildData(guardianId, childId, 'CONFIRM_ERASE_CHILD_DATA');
+    const result = await service.eraseChildData(guardianId, childId, '123456');
 
     expect(result.erased).toBe(true);
     expect(result.childId).toBe(childId);
@@ -238,6 +266,11 @@ describe('GuardianService', () => {
     });
     expect(queryRunner.commitTransaction).toHaveBeenCalled();
     expect(queryRunner.rollbackTransaction).not.toHaveBeenCalled();
+    expect(otpService.verifyOTP).toHaveBeenCalledWith(
+      guardianId,
+      '123456',
+      `ERASE_CHILD_DATA:${childId}`,
+    );
   });
 
   it('should rollback erase transaction if an error occurs midway', async () => {
@@ -259,9 +292,9 @@ describe('GuardianService', () => {
       return [];
     });
 
-    await expect(
-      service.eraseChildData(guardianId, childId, 'CONFIRM_ERASE_CHILD_DATA'),
-    ).rejects.toThrow('Simulated DB failure');
+    await expect(service.eraseChildData(guardianId, childId, '123456')).rejects.toThrow(
+      'Simulated DB failure',
+    );
 
     expect(queryRunner.rollbackTransaction).toHaveBeenCalled();
     expect(queryRunner.commitTransaction).not.toHaveBeenCalled();
@@ -270,15 +303,21 @@ describe('GuardianService', () => {
   it('should throw ForbiddenException when guardian has no relationship with child for erase', async () => {
     queryRunner.manager.query.mockResolvedValueOnce([]);
 
-    await expect(
-      service.eraseChildData(guardianId, childId, 'CONFIRM_ERASE_CHILD_DATA'),
-    ).rejects.toThrow(ForbiddenException);
+    await expect(service.eraseChildData(guardianId, childId, '123456')).rejects.toThrow(
+      ForbiddenException,
+    );
   });
 
-  it('should throw UnauthorizedException for invalid erase confirmation token', async () => {
-    await expect(service.eraseChildData(guardianId, childId, 'wrong-token')).rejects.toThrow(
+  it('should rollback when erase OTP verification fails', async () => {
+    queryRunner.manager.query.mockResolvedValueOnce([
+      { guardian_id: guardianId, child_id: childId },
+    ]);
+    otpService.verifyOTP.mockRejectedValueOnce(new UnauthorizedException('Invalid OTP'));
+
+    await expect(service.eraseChildData(guardianId, childId, '000000')).rejects.toThrow(
       UnauthorizedException,
     );
-    expect(dataSource.createQueryRunner).not.toHaveBeenCalled();
+    expect(queryRunner.rollbackTransaction).toHaveBeenCalled();
+    expect(queryRunner.commitTransaction).not.toHaveBeenCalled();
   });
 });

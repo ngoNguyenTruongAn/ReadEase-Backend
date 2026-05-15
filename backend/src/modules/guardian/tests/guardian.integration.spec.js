@@ -18,13 +18,23 @@ describeDb('GuardianService (DB Integration)', () => {
       await dataSource.initialize();
     }
 
-    service = new GuardianService(dataSource, {
-      get: (key, defaultValue) => {
-        if (key === 'GUARDIAN_EXPORT_CONFIRMATION_TOKEN') return 'CONFIRM_EXPORT_CHILD_DATA';
-        if (key === 'GUARDIAN_ERASE_CONFIRMATION_TOKEN') return 'CONFIRM_ERASE_CHILD_DATA';
-        return defaultValue;
+    service = new GuardianService(
+      dataSource,
+      {
+        get: (key, defaultValue) => {
+          if (key === 'GUARDIAN_EXPORT_CONFIRMATION_TOKEN') return 'CONFIRM_EXPORT_CHILD_DATA';
+          if (key === 'GUARDIAN_ERASE_CONFIRMATION_TOKEN') return 'CONFIRM_ERASE_CHILD_DATA';
+          return defaultValue;
+        },
       },
-    });
+      {
+        createOTP: jest.fn().mockResolvedValue('123456'),
+        verifyOTP: jest.fn().mockResolvedValue(true),
+      },
+      {
+        sendOTP: jest.fn().mockResolvedValue(undefined),
+      },
+    );
   });
 
   afterAll(async () => {
@@ -221,11 +231,7 @@ describeDb('GuardianService (DB Integration)', () => {
   it('should erase all child-related rows from real PostgreSQL with zero residuals', async () => {
     const seed = await seedChildDataset();
 
-    const eraseResult = await service.eraseChildData(
-      seed.guardianId,
-      seed.childId,
-      'CONFIRM_ERASE_CHILD_DATA',
-    );
+    const eraseResult = await service.eraseChildData(seed.guardianId, seed.childId, '123456');
 
     expect(eraseResult.erased).toBe(true);
     expect(eraseResult.childId).toBe(seed.childId);
@@ -264,9 +270,9 @@ describeDb('GuardianService (DB Integration)', () => {
     };
 
     try {
-      await expect(
-        service.eraseChildData(seed.guardianId, seed.childId, 'CONFIRM_ERASE_CHILD_DATA'),
-      ).rejects.toThrow('Forced rollback for integration test');
+      await expect(service.eraseChildData(seed.guardianId, seed.childId, '123456')).rejects.toThrow(
+        'Forced rollback for integration test',
+      );
 
       expect(await countRows('users', 'id', seed.childId)).toBe(1);
       expect(await countRows('reading_sessions', 'user_id', seed.childId)).toBe(1);

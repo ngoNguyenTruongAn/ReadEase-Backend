@@ -33,18 +33,30 @@ class EmailService {
    * Send OTP email
    * @param {string} to - recipient email
    * @param {string} code - 6-digit OTP
-   * @param {'EMAIL_VERIFY'|'FORGOT_PASSWORD'} type
+   * @param {'EMAIL_VERIFY'|'FORGOT_PASSWORD'|'ERASE_CHILD_DATA'} type
    */
   async sendOTP(to, code, type) {
-    const subject =
-      type === 'EMAIL_VERIFY' ? 'ReadEase — Verify Your Account' : 'ReadEase — Reset Your Password';
+    const templates = {
+      EMAIL_VERIFY: {
+        subject: 'ReadEase — Verify Your Account',
+        heading: 'Verify Your Account',
+        description:
+          'Thank you for signing up for ReadEase! Enter the code below to verify your email.',
+      },
+      FORGOT_PASSWORD: {
+        subject: 'ReadEase — Reset Your Password',
+        heading: 'Reset Your Password',
+        description: 'You have requested a password reset. Enter the code below to continue.',
+      },
+      ERASE_CHILD_DATA: {
+        subject: 'ReadEase — Confirm Child Data Erasure',
+        heading: 'Confirm Child Data Erasure',
+        description:
+          'A request was made to permanently erase child data. Enter the code below only if you want to continue.',
+      },
+    };
 
-    const heading = type === 'EMAIL_VERIFY' ? 'Verify Your Account' : 'Reset Your Password';
-
-    const description =
-      type === 'EMAIL_VERIFY'
-        ? 'Thank you for signing up for ReadEase! Enter the code below to verify your email.'
-        : 'You have requested a password reset. Enter the code below to continue.';
+    const template = templates[type] || templates.FORGOT_PASSWORD;
 
     const html = `
       <div style="font-family: 'Segoe UI', Arial, sans-serif; max-width: 480px; margin: 0 auto; padding: 32px; background: #f8f9fa; border-radius: 16px;">
@@ -52,8 +64,8 @@ class EmailService {
           <h1 style="color: #2CCFCF; font-size: 28px; margin: 0;">🐉 ReadEase</h1>
         </div>
         <div style="background: #ffffff; padding: 32px; border-radius: 12px; box-shadow: 0 2px 8px rgba(0,0,0,0.08);">
-          <h2 style="color: #333; font-size: 20px; margin: 0 0 12px;">${heading}</h2>
-          <p style="color: #666; font-size: 14px; line-height: 1.6;">${description}</p>
+          <h2 style="color: #333; font-size: 20px; margin: 0 0 12px;">${template.heading}</h2>
+          <p style="color: #666; font-size: 14px; line-height: 1.6;">${template.description}</p>
           <div style="text-align: center; margin: 24px 0;">
             <div style="display: inline-block; background: #2CCFCF; color: #fff; font-size: 32px; font-weight: bold; letter-spacing: 8px; padding: 16px 32px; border-radius: 12px;">
               ${code}
@@ -85,7 +97,7 @@ class EmailService {
       await this.transporter.sendMail({
         from: this.fromAddress,
         to,
-        subject,
+        subject: template.subject,
         html,
       });
 

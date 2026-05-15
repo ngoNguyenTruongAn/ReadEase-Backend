@@ -19,6 +19,7 @@ describe('GuardianController', () => {
   beforeEach(() => {
     guardianService = {
       exportChildData: jest.fn(),
+      requestEraseOtp: jest.fn(),
       eraseChildData: jest.fn(),
       listGuardiansForChild: jest.fn(),
     };
@@ -66,6 +67,18 @@ describe('GuardianController', () => {
     expect(roles).toEqual(['ROLE_GUARDIAN']);
     expect(limit).toBe(1);
     expect(ttl).toBe(60000);
+  });
+
+  it('should request erase OTP for valid child id', async () => {
+    guardianService.requestEraseOtp.mockResolvedValue({
+      childId,
+      message: 'OTP has been sent to your email. Use it to confirm child data erasure.',
+    });
+
+    const result = await controller.requestEraseOtp(childId, { user: { sub: guardianId } });
+
+    expect(result.childId).toBe(childId);
+    expect(guardianService.requestEraseOtp).toHaveBeenCalledWith(guardianId, childId);
   });
 
   it('should attach child role on my guardians route', () => {
@@ -122,16 +135,12 @@ describe('GuardianController', () => {
 
     const result = await controller.eraseChildData(
       childId,
-      { confirmationToken: 'CONFIRM_ERASE_CHILD_DATA' },
+      { otpCode: '123456' },
       { user: { sub: guardianId } },
     );
 
     expect(result.erased).toBe(true);
-    expect(guardianService.eraseChildData).toHaveBeenCalledWith(
-      guardianId,
-      childId,
-      'CONFIRM_ERASE_CHILD_DATA',
-    );
+    expect(guardianService.eraseChildData).toHaveBeenCalledWith(guardianId, childId, '123456');
   });
 
   it('should throw 400 for invalid childId', async () => {
@@ -144,19 +153,15 @@ describe('GuardianController', () => {
     ).rejects.toThrow(BadRequestException);
   });
 
-  it('should throw 400 when confirmationToken is missing', async () => {
+  it('should throw 400 when otpCode is missing', async () => {
     await expect(
       controller.eraseChildData(childId, {}, { user: { sub: guardianId } }),
     ).rejects.toThrow(BadRequestException);
   });
 
-  it('should throw 400 when confirmationToken format is invalid', async () => {
+  it('should throw 400 when otpCode format is invalid', async () => {
     await expect(
-      controller.eraseChildData(
-        childId,
-        { confirmationToken: 'bad token!' },
-        { user: { sub: guardianId } },
-      ),
+      controller.eraseChildData(childId, { otpCode: 'bad token!' }, { user: { sub: guardianId } }),
     ).rejects.toThrow(BadRequestException);
   });
 });
