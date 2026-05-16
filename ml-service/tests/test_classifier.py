@@ -131,6 +131,29 @@ class TestClassifyEndpoint:
         assert data["state"] in STATES
         assert 0.0 <= data["confidence"] <= 1.0
 
+    def test_classify_erratic_zigzag_as_distraction(self):
+        """Chaotic movement should stay DISTRACTION even when it contains backtracks."""
+        features = {
+            **REGRESSION_FEATURES,
+            "velocity_mean": 520.0,
+            "velocity_std": 160.0,
+            "velocity_max": 850.0,
+            "direction_changes": 6,
+            "regression_count": 9,
+            "path_efficiency": 0.12,
+            "dwell_time_mean": 45.0,
+            "dwell_time_max": 100.0,
+        }
+
+        response = client.post("/classify", json={
+            "session_id": "test-erratic-zigzag",
+            "features": features,
+        })
+
+        assert response.status_code == 200
+        data = response.json()
+        assert data["state"] == "DISTRACTION"
+
     def test_classify_response_time(self):
         """Single classification should complete in < 50ms."""
         start = time.perf_counter()

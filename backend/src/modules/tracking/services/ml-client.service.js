@@ -14,6 +14,17 @@ const { extractFeatures } = require('../utils/feature-extractor');
 const ML_TIMEOUT = parseInt(process.env.ML_CLASSIFY_TIMEOUT || '3000', 10);
 const ML_URL = process.env.ML_SERVICE_URL || process.env.ML_ENGINE_URL || 'http://ml-engine:8000';
 
+function isErraticDistraction(features) {
+  const directionChanges = Number(features?.direction_changes || 0);
+  const pathEfficiency = Number(features?.path_efficiency ?? 1);
+  const dwellTimeMax = Number(features?.dwell_time_max || 0);
+
+  return (
+    (directionChanges >= 4 && pathEfficiency < 0.2 && dwellTimeMax < 150) ||
+    (directionChanges >= 4 && pathEfficiency < 0.1)
+  );
+}
+
 class MlClientService {
   constructor(httpService) {
     this.httpService = httpService;
@@ -45,20 +56,26 @@ class MlClientService {
         },
       );
 
+      const state = isErraticDistraction(features) ? 'DISTRACTION' : response.data.state;
+      const source =
+        state !== response.data.state ? 'ml_model_erratic_override' : 'ml_model';
+
       logger.info('ML classify success', {
         context: 'MlClientService',
         data: {
           sessionId,
-          state: response.data.state,
+          modelState: response.data.state,
+          finalState: state,
           confidence: response.data.confidence,
+          source,
         },
       });
 
       return {
-        state: response.data.state,
+        state,
         confidence: response.data.confidence,
         session_id: sessionId,
-        source: 'ml_model',
+        source,
       };
     } catch (err) {
       logger.warn('ML classify failed, using fallback', {
@@ -79,20 +96,20 @@ class MlClientService {
    * Used when ML service is unavailable or times out.
    *
    * Rules:
+   *   erratic low-efficiency movement    → DISTRACTION
    *   regression_count >= 3            → REGRESSION
-   *   direction_changes >= 5 && eff<0.5 → DISTRACTION
    *   otherwise                        → FLUENT
    */
   fallbackClassify(sessionId, features) {
     let state = 'FLUENT';
     let confidence = 0.6;
 
-    if (features.regression_count >= 3) {
+    if (isErraticDistraction(features)) {
+      state = 'DISTRACTION';
+      confidence = 0.65;
+    } else if (features.regression_count >= 3) {
       state = 'REGRESSION';
       confidence = 0.65;
-    } else if (features.direction_changes >= 5 && features.path_efficiency < 0.5) {
-      state = 'DISTRACTION';
-      confidence = 0.6;
     }
 
     logger.info('Fallback classify result', {

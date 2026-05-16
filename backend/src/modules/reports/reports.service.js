@@ -71,7 +71,10 @@ class ReportsService {
       },
     });
 
-    if (existing) {
+    const shouldReplaceExistingDraft =
+      existing && String(existing.status || '').toUpperCase() !== 'APPROVED';
+
+    if (existing && !shouldReplaceExistingDraft) {
       throw new ConflictException(
         `A report for this period (${weekStart.toISOString().slice(0, 10)} — ${weekEnd.toISOString().slice(0, 10)}) already exists`,
       );
@@ -99,28 +102,40 @@ class ReportsService {
     const aiResult = await this.geminiService.generateWeeklyReport(aggregatedData);
 
     // ── 5. Persist the report as DRAFT ──
-    const report = this.reportRepository.create({
-      child_id: childId,
-      report_type: 'WEEKLY',
-      content: aiResult.content,
-      ai_model: aiResult.model,
-      status: 'DRAFT',
-      period_start: weekStart,
-      period_end: weekEnd,
-    });
+    const report = shouldReplaceExistingDraft
+      ? {
+          ...existing,
+          content: aiResult.content,
+          ai_model: aiResult.model,
+          status: 'DRAFT',
+          approved_by: null,
+          approved_at: null,
+        }
+      : this.reportRepository.create({
+          child_id: childId,
+          report_type: 'WEEKLY',
+          content: aiResult.content,
+          ai_model: aiResult.model,
+          status: 'DRAFT',
+          period_start: weekStart,
+          period_end: weekEnd,
+        });
 
     await this.reportRepository.save(report);
 
-    logger.info('Weekly report saved as DRAFT', {
-      context: 'ReportsService',
-      data: {
-        reportId: report.id,
-        childId,
-        status: 'DRAFT',
-        model: aiResult.model,
-        isFallback: aiResult.isFallback,
+    logger.info(
+      shouldReplaceExistingDraft ? 'Weekly DRAFT report regenerated' : 'Weekly report saved as DRAFT',
+      {
+        context: 'ReportsService',
+        data: {
+          reportId: report.id,
+          childId,
+          status: 'DRAFT',
+          model: aiResult.model,
+          isFallback: aiResult.isFallback,
+        },
       },
-    });
+    );
 
     return report;
   }

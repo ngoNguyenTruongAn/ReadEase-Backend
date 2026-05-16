@@ -273,16 +273,44 @@ describe('MlClientService', () => {
     expect(result.source).toBe('fallback_threshold');
   });
 
-  it('should classify DISTRACTION when direction_changes >= 5 and efficiency < 0.5 (fallback)', () => {
+  it('should classify DISTRACTION when direction changes are high and efficiency is low (fallback)', () => {
     const features = {
       regression_count: 1,
-      direction_changes: 7,
-      path_efficiency: 0.3,
+      direction_changes: 6,
+      path_efficiency: 0.12,
+      dwell_time_max: 80,
     };
 
     const result = service.fallbackClassify('sess-4', features);
 
     expect(result.state).toBe('DISTRACTION');
+    expect(result.source).toBe('fallback_threshold');
+  });
+
+  it('should prefer DISTRACTION over REGRESSION for chaotic zigzag movement (fallback)', () => {
+    const features = {
+      regression_count: 16,
+      direction_changes: 6,
+      path_efficiency: 0.05,
+      dwell_time_max: 16,
+    };
+
+    const result = service.fallbackClassify('sess-chaotic', features);
+
+    expect(result.state).toBe('DISTRACTION');
+    expect(result.source).toBe('fallback_threshold');
+  });
+
+  it('should keep intentional re-reading as REGRESSION when movement is not chaotic', () => {
+    const features = {
+      regression_count: 8,
+      direction_changes: 10,
+      path_efficiency: 0.35,
+    };
+
+    const result = service.fallbackClassify('sess-intentional-regression', features);
+
+    expect(result.state).toBe('REGRESSION');
     expect(result.source).toBe('fallback_threshold');
   });
 
