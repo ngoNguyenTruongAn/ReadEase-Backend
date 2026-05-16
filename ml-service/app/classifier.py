@@ -32,6 +32,19 @@ _scaler = None
 _model_loaded = False
 
 
+def is_erratic_distraction(features_dict: dict) -> bool:
+    """Detect pointer movement that is too chaotic to be intentional re-reading."""
+    direction_changes = features_dict.get("direction_changes", 0)
+    path_eff = features_dict.get("path_efficiency", 1.0)
+    dwell_time_max = features_dict.get("dwell_time_max", 0)
+
+    return (
+        direction_changes >= 4 and path_eff < 0.2 and dwell_time_max < 150
+    ) or (
+        direction_changes >= 4 and path_eff < 0.1
+    )
+
+
 def load_model():
     """
     Load the trained model + scaler from model.joblib.
@@ -77,6 +90,13 @@ def predict(features_dict: dict) -> dict:
     if not _model_loaded:
         return fallback_predict(features_dict)
 
+    if is_erratic_distraction(features_dict):
+        return {
+            "state": "DISTRACTION",
+            "confidence": 0.65,
+            "model_version": "1.0.0-erratic-override",
+        }
+
     # Convert dict → numpy array in correct feature order
     features_array = features_to_array(features_dict)
 
@@ -113,13 +133,16 @@ def fallback_predict(features_dict: dict) -> dict:
     direction_changes = features_dict.get("direction_changes", 0)
     path_eff = features_dict.get("path_efficiency", 1.0)
 
-    # Rule 1: High regressions → REGRESSION
+    # Rule 1: Chaotic movement → DISTRACTION.
+    # Check this before regression: random zigzag also creates many right-to-left
+    # segments, but low path efficiency means the child is not intentionally
+    # re-reading a word sequence.
+    if is_erratic_distraction(features_dict):
+        return {"state": "DISTRACTION", "confidence": 0.55, "model_version": "fallback"}
+
+    # Rule 2: High regressions → REGRESSION
     if regressions > 5:
         return {"state": "REGRESSION", "confidence": 0.55, "model_version": "fallback"}
-
-    # Rule 2: Many direction changes + low path efficiency → DISTRACTION
-    if direction_changes > 15 and path_eff < 0.3:
-        return {"state": "DISTRACTION", "confidence": 0.55, "model_version": "fallback"}
 
     # Rule 3: Very high velocity → DISTRACTION
     if velocity > 500:

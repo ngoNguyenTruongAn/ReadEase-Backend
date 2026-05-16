@@ -221,18 +221,63 @@ describe('ReportsService', () => {
 
   // ── Test 4: Duplicate report ────────────────────────────────────────────
 
-  it('should throw ConflictException when report already exists for period', async () => {
+  it('should throw ConflictException when approved report already exists for period', async () => {
     const userRepo = makeRepoMock();
     userRepo.findOne.mockResolvedValue(mockChild);
 
     const reportRepo = makeRepoMock();
-    reportRepo.findOne.mockResolvedValue({ id: 'existing-report' });
+    reportRepo.findOne.mockResolvedValue({ id: 'existing-report', status: 'APPROVED' });
 
     const { svc } = buildService({ userRepo, reportRepo });
 
     await expect(svc.generateWeeklyReport(childId, weekStart, weekEnd)).rejects.toThrow(
       ConflictException,
     );
+  });
+
+  it('should regenerate an existing draft report for the same period', async () => {
+    const userRepo = makeRepoMock();
+    userRepo.findOne.mockResolvedValue(mockChild);
+
+    const sessionRepo = makeRepoMock();
+    sessionRepo.find.mockResolvedValue([]);
+
+    const reportRepo = makeRepoMock();
+    reportRepo.findOne.mockResolvedValue({
+      id: 'existing-draft',
+      child_id: childId,
+      report_type: 'WEEKLY',
+      content: '# Old incomplete report',
+      ai_model: 'gemini-2.0-flash',
+      status: 'DRAFT',
+      approved_by: null,
+      approved_at: null,
+      period_start: weekStart,
+      period_end: weekEnd,
+    });
+
+    const geminiService = makeGeminiMock({
+      content: '# New complete report',
+      model: 'fallback-local',
+      isFallback: true,
+    });
+
+    const { svc } = buildService({ userRepo, sessionRepo, reportRepo, geminiService });
+
+    const result = await svc.generateWeeklyReport(childId, weekStart, weekEnd);
+
+    expect(reportRepo.create).not.toHaveBeenCalled();
+    expect(reportRepo.save).toHaveBeenCalledWith(
+      expect.objectContaining({
+        id: 'existing-draft',
+        content: '# New complete report',
+        ai_model: 'fallback-local',
+        status: 'DRAFT',
+        approved_by: null,
+        approved_at: null,
+      }),
+    );
+    expect(result.id).toBe('existing-draft');
   });
 
   // ── Test 5: updateReportContent ─────────────────────────────────────────
