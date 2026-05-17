@@ -2,6 +2,7 @@ require('reflect-metadata');
 
 const { BadRequestException } = require('@nestjs/common');
 const { GUARDS_METADATA } = require('@nestjs/common/constants');
+const jwt = require('jsonwebtoken');
 
 const { TrackingController } = require('../tracking.controller');
 const { JwtAuthGuard } = require('../../auth/guards/jwt-auth.guard');
@@ -33,6 +34,7 @@ describe('TrackingController', () => {
 
   afterEach(() => {
     jest.clearAllMocks();
+    delete process.env.JWT_SECRET;
   });
 
   it('should update baseline_json when child profile already exists', async () => {
@@ -175,5 +177,28 @@ describe('TrackingController', () => {
   it('should restrict calibrate endpoint roles to child/guardian/clinician', () => {
     const roles = Reflect.getMetadata('roles', TrackingController.prototype.calibrate);
     expect(roles).toEqual(['ROLE_CHILD', 'ROLE_GUARDIAN', 'ROLE_CLINICIAN']);
+  });
+
+  it('should issue a per-reading tracking token with user_id and session_id claims', async () => {
+    process.env.JWT_SECRET = 'test-secret-with-enough-length';
+
+    const result = await controller.issueSessionToken(
+      { contentId: 'content-1' },
+      { user: { sub: 'child-1', role: 'ROLE_CHILD' } },
+    );
+
+    const decoded = jwt.verify(result.trackingToken, process.env.JWT_SECRET);
+
+    expect(result.sessionId).toBeTruthy();
+    expect(result.tracking_token).toBe(result.trackingToken);
+    expect(decoded.user_id).toBe('child-1');
+    expect(decoded.session_id).toBe(result.sessionId);
+    expect(decoded.content_id).toBe('content-1');
+    expect(decoded.role).toBe('ROLE_CHILD');
+  });
+
+  it('should restrict session token endpoint to child role', () => {
+    const roles = Reflect.getMetadata('roles', TrackingController.prototype.issueSessionToken);
+    expect(roles).toEqual(['ROLE_CHILD']);
   });
 });

@@ -7,9 +7,12 @@ const {
   Req,
   UseGuards,
   BadRequestException,
+  InternalServerErrorException,
   Inject,
 } = require('@nestjs/common');
 const { DataSource } = require('typeorm');
+const crypto = require('crypto');
+const jwt = require('jsonwebtoken');
 
 const { JwtAuthGuard } = require('../auth/guards/jwt-auth.guard');
 const { RolesGuard } = require('../auth/guards/roles.guard');
@@ -82,6 +85,43 @@ class TrackingController {
       baseline: baselineResult.baseline,
     };
   }
+
+  async issueSessionToken(body, req) {
+    const userId = req?.user?.sub;
+    const role = req?.user?.role;
+
+    if (!userId) {
+      throw new BadRequestException('Missing authenticated user');
+    }
+
+    if (!process.env.JWT_SECRET) {
+      throw new InternalServerErrorException('JWT secret is not configured');
+    }
+
+    const sessionId = crypto.randomUUID();
+    const contentId = body?.contentId || body?.content_id || null;
+    const expiresIn = '2h';
+
+    const trackingToken = jwt.sign(
+      {
+        user_id: userId,
+        session_id: sessionId,
+        role,
+        ...(contentId ? { content_id: contentId } : {}),
+      },
+      process.env.JWT_SECRET,
+      { expiresIn },
+    );
+
+    return {
+      trackingToken,
+      tracking_token: trackingToken,
+      sessionId,
+      session_id: sessionId,
+      expiresIn,
+      expires_in: expiresIn,
+    };
+  }
 }
 
 Controller('api/v1')(TrackingController);
@@ -105,5 +145,19 @@ Reflect.decorate(
 );
 Body()(TrackingController.prototype, 'calibrate', 0);
 Req()(TrackingController.prototype, 'calibrate', 1);
+
+const issueSessionTokenDescriptor = Object.getOwnPropertyDescriptor(
+  TrackingController.prototype,
+  'issueSessionToken',
+);
+
+Reflect.decorate(
+  [Post('tracking/session-token'), UseGuards(JwtAuthGuard, RolesGuard), Roles('ROLE_CHILD')],
+  TrackingController.prototype,
+  'issueSessionToken',
+  issueSessionTokenDescriptor,
+);
+Body()(TrackingController.prototype, 'issueSessionToken', 0);
+Req()(TrackingController.prototype, 'issueSessionToken', 1);
 
 module.exports = { TrackingController };

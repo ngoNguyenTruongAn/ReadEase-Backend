@@ -6,10 +6,12 @@ const { logger } = require('../../../common/logger/winston.config');
 const { redis_flush_latency } = require('../../../common/observability/metrics');
 
 const ReplayStorageService = require('./replay-storage.service');
+const MouseEventStorageService = require('./mouse-event-storage.service');
 
 class TrajectoryBufferService {
-  constructor(replayStorageService) {
+  constructor(replayStorageService, mouseEventStorageService) {
     this.replayStorage = replayStorageService;
+    this.mouseEventStorage = mouseEventStorageService;
 
     this.redis = new Redis({
       host: process.env.REDIS_HOST,
@@ -70,6 +72,7 @@ class TrajectoryBufferService {
       const parsed = events.map((e) => JSON.parse(e));
 
       await this.replayStorage.storeEvents(sessionId, parsed);
+      await this.mouseEventStorage.storeEvents(sessionId, parsed);
 
       await this.redis.del(key);
 
@@ -124,10 +127,15 @@ class TrajectoryBufferService {
       this.flushing = false;
     }
   }
+
+  clearSession(sessionId) {
+    this.mouseEventStorage.clearSession(sessionId);
+  }
 }
 
 Injectable()(TrajectoryBufferService);
 
 Inject(ReplayStorageService)(TrajectoryBufferService, undefined, 0);
+Inject(MouseEventStorageService)(TrajectoryBufferService, undefined, 1);
 
 module.exports = TrajectoryBufferService;

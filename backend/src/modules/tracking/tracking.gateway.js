@@ -90,6 +90,7 @@ class TrackingGateway {
 
     this.rollingWindows.delete(client.session_id);
     this.lastInterventions.delete(client.session_id);
+    this.trajectoryBuffer.clearSession(client.session_id);
   }
 
   resetSessionTracking(sessionId) {
