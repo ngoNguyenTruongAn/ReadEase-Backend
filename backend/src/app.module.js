@@ -32,6 +32,7 @@ const { GamificationModule } = require('./modules/gamification/gamification.modu
 const { GuardianModule } = require('./modules/guardian/guardian.module');
 const { ReportsModule } = require('./modules/reports/reports.module');
 const { LexicalModule } = require('./modules/lexical/lexical.module');
+const { ClinicianModule } = require('./modules/clinician/clinician.module');
 
 const entities = [
   UserEntity,
@@ -79,6 +80,7 @@ const metadata = {
     GamificationModule,
     GuardianModule,
     ReportsModule,
+    ClinicianModule,
     LexicalModule, // [S3-T02] Gemini word simplification for semantic intervention
     ThrottlerModule.forRoot([
       {
