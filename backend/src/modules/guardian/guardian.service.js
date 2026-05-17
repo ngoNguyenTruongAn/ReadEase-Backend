@@ -63,6 +63,11 @@ class GuardianService {
           COALESCE(t.balance, 0)::int AS token_balance,
           COALESCE(s.session_count, 0)::int AS session_count,
           s.last_session_at,
+          g.guardian_name,
+          g.guardian_email,
+          COALESCE(g.guardians, '[]'::jsonb) AS guardians,
+          (COALESCE(g.guardian_count, 0) > 0) AS has_guardian_link,
+          g.guardian_linked_at,
           gc.consent_given_at
         FROM users c
         JOIN guardian_children gc ON c.id = gc.child_id
@@ -77,6 +82,28 @@ class GuardianService {
           FROM reading_sessions
           GROUP BY user_id
         ) s ON c.id = s.user_id
+        LEFT JOIN (
+          SELECT
+            gc.child_id,
+            (ARRAY_AGG(u.display_name ORDER BY gc.consent_given_at DESC))[1] AS guardian_name,
+            (ARRAY_AGG(u.email ORDER BY gc.consent_given_at DESC))[1] AS guardian_email,
+            JSONB_AGG(
+              JSONB_BUILD_OBJECT(
+                'id', u.id,
+                'display_name', u.display_name,
+                'full_name', u.display_name,
+                'email', u.email
+              )
+              ORDER BY gc.consent_given_at DESC
+            ) AS guardians,
+            COUNT(*)::int AS guardian_count,
+            MAX(gc.consent_given_at) AS guardian_linked_at
+          FROM guardian_children gc
+          JOIN users u ON gc.guardian_id = u.id
+          WHERE u.role = 'ROLE_GUARDIAN'
+            AND u.deleted_at IS NULL
+          GROUP BY gc.child_id
+        ) g ON c.id = g.child_id
         WHERE gc.guardian_id = $1
           AND c.deleted_at IS NULL
         ORDER BY c.created_at DESC
@@ -101,7 +128,11 @@ class GuardianService {
         COALESCE(t.balance, 0)::int AS token_balance,
         COALESCE(s.session_count, 0)::int AS session_count,
         s.last_session_at,
-        g.guardian_name
+        g.guardian_name,
+        g.guardian_email,
+        COALESCE(g.guardians, '[]'::jsonb) AS guardians,
+        (COALESCE(g.guardian_count, 0) > 0) AS has_guardian_link,
+        g.guardian_linked_at
       FROM users c
       LEFT JOIN children_profiles cp ON c.id = cp.user_id
       LEFT JOIN (
@@ -115,10 +146,26 @@ class GuardianService {
         GROUP BY user_id
       ) s ON c.id = s.user_id
       LEFT JOIN (
-        SELECT gc.child_id, u.display_name AS guardian_name
+        SELECT
+          gc.child_id,
+          (ARRAY_AGG(u.display_name ORDER BY gc.consent_given_at DESC))[1] AS guardian_name,
+          (ARRAY_AGG(u.email ORDER BY gc.consent_given_at DESC))[1] AS guardian_email,
+          JSONB_AGG(
+            JSONB_BUILD_OBJECT(
+              'id', u.id,
+              'display_name', u.display_name,
+              'full_name', u.display_name,
+              'email', u.email
+            )
+            ORDER BY gc.consent_given_at DESC
+          ) AS guardians,
+          COUNT(*)::int AS guardian_count,
+          MAX(gc.consent_given_at) AS guardian_linked_at
         FROM guardian_children gc
         JOIN users u ON gc.guardian_id = u.id
-        LIMIT 1
+        WHERE u.role = 'ROLE_GUARDIAN'
+          AND u.deleted_at IS NULL
+        GROUP BY gc.child_id
       ) g ON c.id = g.child_id
       WHERE c.role = 'ROLE_CHILD'
         AND c.deleted_at IS NULL

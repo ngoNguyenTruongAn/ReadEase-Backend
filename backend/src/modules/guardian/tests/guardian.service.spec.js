@@ -84,6 +84,84 @@ describe('GuardianService', () => {
     ]);
   });
 
+  it('should list all children for clinicians with guardian details grouped by child', async () => {
+    dataSource.query.mockResolvedValueOnce([
+      {
+        id: childId,
+        email: 'child@test.com',
+        display_name: 'Child A',
+        is_active: true,
+        guardian_name: 'Guardian A',
+        guardian_email: 'guardian@test.com',
+        guardians: [
+          {
+            id: guardianId,
+            display_name: 'Guardian A',
+            full_name: 'Guardian A',
+            email: 'guardian@test.com',
+          },
+        ],
+        has_guardian_link: true,
+        guardian_linked_at: '2026-03-01T00:00:00.000Z',
+      },
+    ]);
+
+    const result = await service.listAllChildren({ role: 'ROLE_CLINICIAN', sub: 'clinician-1' });
+
+    expect(result[0]).toMatchObject({
+      guardian_name: 'Guardian A',
+      guardian_email: 'guardian@test.com',
+      has_guardian_link: true,
+      guardian_linked_at: '2026-03-01T00:00:00.000Z',
+    });
+    expect(result[0].guardians).toEqual([
+      {
+        id: guardianId,
+        display_name: 'Guardian A',
+        full_name: 'Guardian A',
+        email: 'guardian@test.com',
+      },
+    ]);
+
+    const sql = dataSource.query.mock.calls[0][0];
+    expect(sql).toContain('JSONB_AGG');
+    expect(sql).toContain('GROUP BY gc.child_id');
+    expect(sql).not.toContain('LIMIT 1');
+  });
+
+  it('should include guardian link metadata when guardians list their children', async () => {
+    dataSource.query.mockResolvedValueOnce([
+      {
+        id: childId,
+        email: 'child@test.com',
+        display_name: 'Child A',
+        guardian_name: 'Guardian A',
+        guardian_email: 'guardian@test.com',
+        guardians: [
+          {
+            id: guardianId,
+            display_name: 'Guardian A',
+            full_name: 'Guardian A',
+            email: 'guardian@test.com',
+          },
+        ],
+        has_guardian_link: true,
+        guardian_linked_at: '2026-03-01T00:00:00.000Z',
+      },
+    ]);
+
+    const result = await service.listAllChildren({ role: 'ROLE_GUARDIAN', sub: guardianId });
+
+    expect(result[0]).toMatchObject({
+      guardian_name: 'Guardian A',
+      guardian_email: 'guardian@test.com',
+      has_guardian_link: true,
+    });
+    expect(dataSource.query).toHaveBeenCalledWith(expect.stringContaining('gc.guardian_id = $1'), [
+      guardianId,
+    ]);
+  });
+
   it('should export complete child data when guardian relationship and token are valid', async () => {
     dataSource.query
       .mockResolvedValueOnce([
