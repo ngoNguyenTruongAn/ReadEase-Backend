@@ -7,18 +7,20 @@ const { TrackingController } = require('./tracking.controller');
 
 const TrajectoryBufferService = require('./services/trajectory-buffer.service');
 const ReplayStorageService = require('./services/replay-storage.service');
+const MouseEventStorageService = require('./services/mouse-event-storage.service');
 const SessionService = require('./services/session.service');
 const MlClientService = require('./services/ml-client.service');
 const { GamificationModule } = require('../gamification/gamification.module');
 const { LexicalModule } = require('../lexical/lexical.module');
 
 const { SessionReplayEventEntity } = require('./entities/session-replay-event.entity');
+const { MouseEventEntity } = require('./entities/mouse-event.entity');
 
 class TrackingModule {}
 
 Module({
   imports: [
-    TypeOrmModule.forFeature([SessionReplayEventEntity]),
+    TypeOrmModule.forFeature([SessionReplayEventEntity, MouseEventEntity]),
     HttpModule,
     GamificationModule,
     LexicalModule, // provides LexicalService for WS gateway semantic intervention
@@ -28,6 +30,7 @@ Module({
     TrackingGateway,
     TrajectoryBufferService,
     ReplayStorageService,
+    MouseEventStorageService,
     SessionService,
     MlClientService,
   ],

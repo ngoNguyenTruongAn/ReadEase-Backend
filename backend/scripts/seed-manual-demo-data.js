@@ -5,8 +5,10 @@
  * This script is intentionally idempotent:
  * - Users are upserted by email.
  * - Guardian-child links are inserted if missing.
- * - Reading sessions created by this script are replaced on each run.
- * - The 100-token child bonus created by this script is replaced on each run.
+ * - Existing demo child sessions, reports, redemptions, and tokens are reset on each run.
+ * - Only report-demo children receive seeded reading sessions.
+ * - Reading-demo children are left with empty reading data.
+ * - Each child receives exactly one 100-token starting bonus after reset.
  *
  * It does not create weekly reports.
  */
@@ -19,6 +21,7 @@ const path = require('path');
 const SEED_SOURCE = 'manual-demo-seed';
 const PASSWORD = 'ReadEase@2026';
 const BONUS_REASON = 'Manual demo seed: 100 starting tokens';
+const REPORT_DEMO_CHILD_KEYS = new Set(['baoNam', 'haMy']);
 
 function loadEnv() {
   const envPath = path.resolve(__dirname, '..', '.env');
@@ -62,6 +65,7 @@ const accounts = [
     dateOfBirth: '2018-09-05',
     scenario: 'IMPROVING',
     scenarioLabel: 'Co cai thien ro ret',
+    demoPurpose: 'READING_DEMO_EMPTY',
     effortScores: [0.52, 0.61, 0.7, 0.78, 0.86, 0.91],
   },
   {
@@ -81,6 +85,7 @@ const accounts = [
     dateOfBirth: '2017-06-12',
     scenario: 'FLAT',
     scenarioLabel: 'Khong cai thien',
+    demoPurpose: 'REPORT_DEMO_WITH_SESSIONS',
     effortScores: [0.62, 0.61, 0.63, 0.6, 0.62, 0.61],
   },
   {
@@ -100,6 +105,7 @@ const accounts = [
     dateOfBirth: '2016-03-22',
     scenario: 'DECLINING',
     scenarioLabel: 'Giam lien tuc',
+    demoPurpose: 'REPORT_DEMO_WITH_SESSIONS',
     effortScores: [0.84, 0.76, 0.67, 0.58, 0.49, 0.4],
   },
   {
@@ -119,6 +125,7 @@ const accounts = [
     dateOfBirth: '2015-11-18',
     scenario: 'MIXED',
     scenarioLabel: 'Luc tang luc giam',
+    demoPurpose: 'READING_DEMO_EMPTY',
     effortScores: [0.5, 0.72, 0.55, 0.8, 0.58, 0.74],
   },
   {
@@ -167,6 +174,10 @@ function addDays(date, days) {
 
 function round4(value) {
   return Number(value.toFixed(4));
+}
+
+function isReportDemoChild(child) {
+  return REPORT_DEMO_CHILD_KEYS.has(child.key);
 }
 
 async function upsertUser(client, account, passwordHash) {
@@ -231,10 +242,12 @@ async function upsertChildProfile(client, child) {
         source: SEED_SOURCE,
         scenario: child.scenario,
         scenarioLabel: child.scenarioLabel,
+        demoPurpose: child.demoPurpose,
       }),
       JSON.stringify({
         theme: 'demo',
         assistive_reading: true,
+        demoPurpose: child.demoPurpose,
       }),
     ],
   );
@@ -283,26 +296,33 @@ async function clearPriorSeedRows(client, childIds) {
     `
     DELETE FROM tokens
     WHERE child_id = ANY($1::uuid[])
-      AND reason = $2
     `,
-    [childIds, BONUS_REASON],
+    [childIds],
   );
 
-  const priorSessions = await client.query(
+  await client.query(
     `
-    SELECT id
-    FROM reading_sessions
-    WHERE user_id = ANY($1::uuid[])
-      AND settings->>'source' = $2
+    DELETE FROM redemptions
+    WHERE child_id = ANY($1::uuid[])
     `,
-    [childIds, SEED_SOURCE],
+    [childIds],
   );
 
-  const sessionIds = priorSessions.rows.map((row) => row.id);
-  if (sessionIds.length === 0) return;
+  await client.query(
+    `
+    DELETE FROM reports
+    WHERE child_id = ANY($1::uuid[])
+    `,
+    [childIds],
+  );
 
-  await client.query('DELETE FROM tokens WHERE session_id = ANY($1::uuid[])', [sessionIds]);
-  await client.query('DELETE FROM reading_sessions WHERE id = ANY($1::uuid[])', [sessionIds]);
+  await client.query(
+    `
+    DELETE FROM reading_sessions
+    WHERE user_id = ANY($1::uuid[])
+    `,
+    [childIds],
+  );
 }
 
 async function insertStartingBonus(client, child) {
@@ -444,6 +464,7 @@ async function insertReadingSessions(client, child, contents, baseDate) {
           source: SEED_SOURCE,
           scenario: child.scenario,
           scenarioLabel: child.scenarioLabel,
+          demoPurpose: child.demoPurpose,
           total_events: totalEvents,
           state_counts: counts,
           confidence_avg: round4(0.72 + effortScore * 0.22),
@@ -453,6 +474,7 @@ async function insertReadingSessions(client, child, contents, baseDate) {
           source: SEED_SOURCE,
           scenario: child.scenario,
           scenarioLabel: child.scenarioLabel,
+          demoPurpose: child.demoPurpose,
           sequence: index + 1,
           demoNote: 'Seeded only for analytics/report demo; report rows are not generated.',
         }),
@@ -524,13 +546,18 @@ async function main() {
     const childIds = children.map((child) => child.id);
     await clearPriorSeedRows(client, childIds);
 
-    const contents = await getContents(client);
+    const reportDemoChildren = children.filter(isReportDemoChild);
+    const readingDemoChildren = children.filter((child) => !isReportDemoChild(child));
+    const contents = reportDemoChildren.length > 0 ? await getContents(client) : [];
     const baseDate = new Date();
     baseDate.setDate(baseDate.getDate() - 6);
     baseDate.setHours(9, 0, 0, 0);
 
     for (const child of children) {
       await insertStartingBonus(client, child);
+    }
+
+    for (const child of reportDemoChildren) {
       await insertReadingSessions(client, child, contents, baseDate);
     }
 
@@ -549,6 +576,16 @@ async function main() {
     for (const child of children) {
       const guardian = guardians.find((account) => account.pair === child.pair);
       console.log(`- ${guardian.email} -> ${child.email} (${child.scenarioLabel})`);
+    }
+
+    console.log('\nReport-demo children with seeded reading sessions:');
+    for (const child of reportDemoChildren) {
+      console.log(`- ${child.displayName} <${child.email}> (${child.scenarioLabel})`);
+    }
+
+    console.log('\nReading-demo children left with empty reading data:');
+    for (const child of readingDemoChildren) {
+      console.log(`- ${child.displayName} <${child.email}>`);
     }
 
     console.log('\nChild seed summary:');
