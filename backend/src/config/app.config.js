@@ -8,6 +8,7 @@ const APP_SCHEMA = {
   APP_PORT: Joi.number().default(3000),
   APP_ENV: Joi.string().valid('development', 'staging', 'production').default('development'),
   LOG_LEVEL: Joi.string().valid('error', 'warn', 'info', 'debug', 'verbose').default('debug'),
+  FRONTEND_ORIGINS: Joi.string().optional().allow('').default(''),
 };
 
 const appConfig = () => ({
@@ -16,6 +17,7 @@ const appConfig = () => ({
     env: process.env.APP_ENV || 'development',
     logLevel: process.env.LOG_LEVEL || 'debug',
     isProduction: process.env.APP_ENV === 'production',
+    frontendOrigins: process.env.FRONTEND_ORIGINS || '',
   },
 });
 

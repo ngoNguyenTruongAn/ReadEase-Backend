@@ -31,16 +31,19 @@ services:
       - JWT_ACCESS_TTL=${JWT_ACCESS_TTL:-900}
       - JWT_REFRESH_TTL=${JWT_REFRESH_TTL:-604800}
       - ML_ENGINE_URL=http://ml-engine:8000
+      - ML_SERVICE_URL=http://ml-engine:8000
       - ML_TIMEOUT_MS=${ML_TIMEOUT_MS:-5000}
       - SUPABASE_URL=${SUPABASE_URL}
       - SUPABASE_SERVICE_KEY=${SUPABASE_SERVICE_KEY}
       - SUPABASE_BUCKET=${SUPABASE_BUCKET:-media}
       - GEMINI_API_KEY=${GEMINI_API_KEY:-}
       - GEMINI_MODEL=${GEMINI_MODEL:-gemini-2.0-flash}
+      - FRONTEND_ORIGINS=${FRONTEND_ORIGINS:-}
       - SMTP_HOST=${SMTP_HOST:-}
       - SMTP_PORT=${SMTP_PORT:-587}
       - SMTP_USER=${SMTP_USER:-}
-      - SMTP_PASS=${SMTP_PASS:-}
+      - SMTP_PASSWORD=${SMTP_PASSWORD:-}
+      - SMTP_FROM=${SMTP_FROM:-}
     depends_on:
       postgres:
         condition: service_healthy

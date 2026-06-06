@@ -19,10 +19,15 @@ async function bootstrap() {
   app.useBodyParser('urlencoded', { limit: '5mb', extended: true });
 
   // CORS — restrict to known frontend origins
+  const frontendOriginsStr = configService.get('app.frontendOrigins', '');
+  const prodOrigins = frontendOriginsStr
+    ? frontendOriginsStr.split(',').map((o) => o.trim()).filter(Boolean)
+    : ['https://readease.app'];
+
   app.enableCors({
     origin:
       env === 'production'
-        ? ['https://readease.app']
+        ? prodOrigins
         : [
             'http://localhost:3001',
             'http://localhost:5173',

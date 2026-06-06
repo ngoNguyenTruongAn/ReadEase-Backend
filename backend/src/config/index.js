@@ -17,6 +17,7 @@ const { jwtConfig, JWT_SCHEMA } = require('./jwt.config');
  */
 const ML_SCHEMA = {
   ML_ENGINE_URL: Joi.string().uri().default('http://localhost:8000'),
+  ML_SERVICE_URL: Joi.string().optional().allow('').default(''),
   ML_TIMEOUT_MS: Joi.number().default(5000),
 };
 
@@ -67,7 +68,7 @@ const validationOptions = {
  */
 const mlEngineConfig = () => ({
   mlEngine: {
-    url: process.env.ML_ENGINE_URL || 'http://localhost:8000',
+    url: process.env.ML_SERVICE_URL || process.env.ML_ENGINE_URL || 'http://localhost:8000',
     timeoutMs: parseInt(process.env.ML_TIMEOUT_MS, 10) || 5000,
   },
 });

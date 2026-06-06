@@ -128,6 +128,13 @@ def health():
     }
 
 
+# ── GET /health — Standard Health Check ─────────────────────
+@app.get("/health")
+def health_endpoint():
+    """Standardized health check."""
+    return {"status": "ok"}
+
+
 # ── POST /classify — Cognitive State Prediction ───────────
 @app.post("/classify", response_model=ClassifyResponse)
 def classify(request: ClassifyRequest):

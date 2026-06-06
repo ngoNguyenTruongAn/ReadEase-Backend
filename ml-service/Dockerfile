@@ -14,6 +14,9 @@ RUN pip install --no-cache-dir -r requirements.txt
 # Copy application code
 COPY . .
 
+# Run model training to guarantee model.joblib matches the installed scikit-learn version
+RUN python training/train_model.py
+
 # Expose port 8000
 EXPOSE 8000
 
