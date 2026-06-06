@@ -207,12 +207,7 @@ const listMyGuardiansDescriptor = Object.getOwnPropertyDescriptor(
   'listMyGuardians',
 );
 Reflect.decorate(
-  [
-    Get('my-guardians'),
-    HttpCode(200),
-    UseGuards(JwtAuthGuard, RolesGuard),
-    Roles('ROLE_CHILD'),
-  ],
+  [Get('my-guardians'), HttpCode(200), UseGuards(JwtAuthGuard, RolesGuard), Roles('ROLE_CHILD')],
   GuardianController.prototype,
   'listMyGuardians',
   listMyGuardiansDescriptor,

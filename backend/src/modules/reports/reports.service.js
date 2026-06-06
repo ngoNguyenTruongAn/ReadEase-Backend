@@ -124,7 +124,9 @@ class ReportsService {
     await this.reportRepository.save(report);
 
     logger.info(
-      shouldReplaceExistingDraft ? 'Weekly DRAFT report regenerated' : 'Weekly report saved as DRAFT',
+      shouldReplaceExistingDraft
+        ? 'Weekly DRAFT report regenerated'
+        : 'Weekly report saved as DRAFT',
       {
         context: 'ReportsService',
         data: {

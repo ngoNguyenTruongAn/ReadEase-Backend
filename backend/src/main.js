@@ -21,7 +21,10 @@ async function bootstrap() {
   // CORS — restrict to known frontend origins
   const frontendOriginsStr = configService.get('app.frontendOrigins', '');
   const prodOrigins = frontendOriginsStr
-    ? frontendOriginsStr.split(',').map((o) => o.trim()).filter(Boolean)
+    ? frontendOriginsStr
+        .split(',')
+        .map((o) => o.trim())
+        .filter(Boolean)
     : ['https://readease.app'];
 
   app.enableCors({

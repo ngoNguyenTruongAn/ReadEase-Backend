@@ -263,7 +263,9 @@ class GeminiService {
   }
 
   _stripReportEndMarker(text) {
-    return String(text || '').replace(REPORT_END_MARKER, '').trim();
+    return String(text || '')
+      .replace(REPORT_END_MARKER, '')
+      .trim();
   }
 
   _validateAiReportContent(text) {
@@ -296,7 +298,14 @@ class GeminiService {
       }
     });
 
-    const expectedOrder = ['overview', 'sessions', 'improvement', 'content', 'cognitive', 'comment'];
+    const expectedOrder = [
+      'overview',
+      'sessions',
+      'improvement',
+      'content',
+      'cognitive',
+      'comment',
+    ];
     const presentOrderedIndexes = expectedOrder
       .map((key) => headingIndexes[key])
       .filter((index) => index >= 0);
@@ -353,8 +362,7 @@ class GeminiService {
 
     const rest = lines.slice(headingIndex + 1);
     const nextHeadingOffset = rest.findIndex((line) => /^#{1,3}\s+\S/.test(line.trim()));
-    const sectionLines =
-      nextHeadingOffset >= 0 ? rest.slice(0, nextHeadingOffset) : rest;
+    const sectionLines = nextHeadingOffset >= 0 ? rest.slice(0, nextHeadingOffset) : rest;
 
     return sectionLines.join('\n');
   }

@@ -57,8 +57,7 @@ class MlClientService {
       );
 
       const state = isErraticDistraction(features) ? 'DISTRACTION' : response.data.state;
-      const source =
-        state !== response.data.state ? 'ml_model_erratic_override' : 'ml_model';
+      const source = state !== response.data.state ? 'ml_model_erratic_override' : 'ml_model';
 
       logger.info('ML classify success', {
         context: 'MlClientService',
