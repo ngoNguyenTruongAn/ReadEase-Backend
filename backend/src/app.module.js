@@ -66,6 +66,11 @@ const metadata = {
         username: configService.get('database.username'),
         password: configService.get('database.password'),
         database: configService.get('database.name'),
+        ssl: configService.get('database.ssl')
+          ? {
+              rejectUnauthorized: configService.get('database.sslRejectUnauthorized', true),
+            }
+          : false,
         entities,
         synchronize: false, // NEVER true in production — use migrations
         logging: configService.get('app.env') === 'development',

@@ -1,202 +1,179 @@
-/**
- * Supabase Storage Service
- *
- * Handles file upload, delete, and public URL generation
- * using Supabase Storage buckets.
- *
- * Bucket: 'media' (auto-created if not exists)
- */
-
 const { Injectable } = require('@nestjs/common');
+const {
+  S3Client,
+  PutObjectCommand,
+  GetObjectCommand,
+  DeleteObjectCommand,
+  ListObjectsV2Command,
+} = require('@aws-sdk/client-s3');
 const { createClient } = require('@supabase/supabase-js');
 const { logger } = require('../../common/logger/winston.config');
 
 class StorageService {
   constructor() {
+    this.s3Bucket = process.env.S3_MEDIA_BUCKET || '';
+    this.awsRegion = process.env.AWS_REGION || 'ap-southeast-1';
+
+    if (this.s3Bucket) {
+      this.provider = 's3';
+      this.s3 = new S3Client({ region: this.awsRegion });
+      logger.info('S3 storage configured', {
+        context: 'StorageService',
+        data: { bucket: this.s3Bucket, region: this.awsRegion },
+      });
+      return;
+    }
+
     const url = process.env.SUPABASE_URL || '';
     const key = process.env.SUPABASE_SERVICE_KEY || '';
     this.bucket = process.env.SUPABASE_BUCKET || 'media';
 
     if (!url || !key) {
-      logger.warn('Supabase credentials not configured — storage disabled', {
-        context: 'StorageService',
-      });
+      this.provider = null;
       this.supabase = null;
+      logger.warn('Storage is not configured', { context: 'StorageService' });
       return;
     }
 
+    this.provider = 'supabase';
     this.supabase = createClient(url, key);
-
-    // Ensure bucket exists on startup
-    this.ensureBucket().catch((err) => {
-      logger.error('Failed to ensure bucket', {
+    this.ensureSupabaseBucket().catch((err) => {
+      logger.error('Failed to ensure Supabase bucket', {
         context: 'StorageService',
         data: { error: err.message },
       });
     });
   }
 
-  /**
-   * Create bucket if it doesn't exist
-   */
-  async ensureBucket() {
-    if (!this.supabase) return;
+  async ensureSupabaseBucket() {
+    if (this.provider !== 'supabase') return;
 
     const { data: buckets } = await this.supabase.storage.listBuckets();
-    const exists = buckets?.some((b) => b.name === this.bucket);
+    if (buckets?.some((bucket) => bucket.name === this.bucket)) return;
 
-    if (!exists) {
-      const { error } = await this.supabase.storage.createBucket(this.bucket, {
-        public: true,
-        fileSizeLimit: 10 * 1024 * 1024, // 10 MB max
-        allowedMimeTypes: [
-          'image/png',
-          'image/jpeg',
-          'image/gif',
-          'image/svg+xml',
-          'image/webp',
-          'text/plain',
-          'text/plain; charset=utf-8',
-          'application/json',
-        ],
-      });
+    const { error } = await this.supabase.storage.createBucket(this.bucket, {
+      public: true,
+      fileSizeLimit: 10 * 1024 * 1024,
+      allowedMimeTypes: [
+        'image/png',
+        'image/jpeg',
+        'image/gif',
+        'image/svg+xml',
+        'image/webp',
+        'text/plain',
+        'text/plain; charset=utf-8',
+        'application/json',
+      ],
+    });
 
-      if (error) {
-        logger.error('Create bucket failed', {
-          context: 'StorageService',
-          data: { error: error.message },
-        });
-      } else {
-        logger.info(`Bucket "${this.bucket}" created`, { context: 'StorageService' });
-      }
-    } else {
-      // Update existing bucket to ensure new MIME types are applied remote
-      const { error } = await this.supabase.storage.updateBucket(this.bucket, {
-        public: true,
-        fileSizeLimit: 10 * 1024 * 1024,
-        allowedMimeTypes: [
-          'image/png',
-          'image/jpeg',
-          'image/gif',
-          'image/svg+xml',
-          'image/webp',
-          'text/plain',
-          'text/plain; charset=utf-8',
-          'application/json',
-        ],
-      });
-      if (error) {
-        logger.error('Update bucket config failed', {
-          context: 'StorageService',
-          data: { error: error.message },
-        });
-      } else {
-        logger.info(`Bucket "${this.bucket}" config updated`, { context: 'StorageService' });
-      }
-    }
+    if (error) throw new Error(error.message);
   }
 
-  /**
-   * Upload file to Supabase Storage
-   *
-   * @param {Buffer} fileBuffer - File content
-   * @param {string} originalName - Original filename
-   * @param {string} mimeType - MIME type (image/png, etc.)
-   * @param {string} folder - Subfolder in bucket (avatars, covers, rewards)
-   * @returns {Promise<{url: string, key: string}>}
-   */
-  async upload(fileBuffer, originalName, mimeType, folder = 'general') {
-    if (!this.supabase) {
-      throw new Error(
-        'Supabase Storage is not configured. Please add SUPABASE_URL and SUPABASE_SERVICE_KEY to .env',
-      );
-    }
+  buildKey(originalName, folder) {
+    const safeFolder = String(folder || 'general').replace(/[^a-zA-Z0-9/_-]/g, '_');
+    const safeName = String(originalName).replace(/[^a-zA-Z0-9._-]/g, '_');
+    return `${safeFolder}/${Date.now()}-${safeName}`;
+  }
 
-    // Generate unique filename: folder/timestamp-originalname
-    const timestamp = Date.now();
-    const safeName = originalName.replace(/[^a-zA-Z0-9.\-_]/g, '_');
-    const key = `${folder}/${timestamp}-${safeName}`;
+  getFileUrl(key) {
+    return `/api/v1/upload/file/content?key=${encodeURIComponent(key)}`;
+  }
+
+  async upload(fileBuffer, originalName, mimeType, folder = 'general') {
+    if (!this.provider) throw new Error('Storage is not configured');
+
+    const key = this.buildKey(originalName, folder);
+
+    if (this.provider === 's3') {
+      await this.s3.send(
+        new PutObjectCommand({
+          Bucket: this.s3Bucket,
+          Key: key,
+          Body: fileBuffer,
+          ContentType: mimeType,
+          ServerSideEncryption: 'AES256',
+        }),
+      );
+
+      logger.info('File uploaded to S3', {
+        context: 'StorageService',
+        data: { key, size: fileBuffer.length },
+      });
+      return { url: this.getFileUrl(key), key };
+    }
 
     const { error } = await this.supabase.storage.from(this.bucket).upload(key, fileBuffer, {
       contentType: mimeType,
       upsert: false,
     });
+    if (error) throw new Error(`Upload failed: ${error.message}`);
 
-    if (error) {
-      logger.error('Upload failed', {
-        context: 'StorageService',
-        data: { key, error: error.message },
-      });
-      throw new Error(`Upload failed: ${error.message}`);
-    }
-
-    const url = this.getPublicUrl(key);
-
-    logger.info('File uploaded', {
-      context: 'StorageService',
-      data: { key, url, size: fileBuffer.length },
-    });
-
-    return { url, key };
+    return { url: this.getPublicUrl(key), key };
   }
 
-  /**
-   * Get public URL for a file
-   */
   getPublicUrl(key) {
-    if (!this.supabase) return null;
+    if (this.provider === 's3') return this.getFileUrl(key);
+    if (this.provider !== 'supabase') return null;
 
     const { data } = this.supabase.storage.from(this.bucket).getPublicUrl(key);
-
     return data?.publicUrl || null;
   }
 
-  /**
-   * Delete file from storage
-   *
-   * @param {string} key - File key (e.g. "avatars/123-photo.png")
-   */
+  async download(key) {
+    if (!key || this.provider !== 's3') {
+      throw new Error('S3 storage is not configured');
+    }
+
+    const result = await this.s3.send(
+      new GetObjectCommand({ Bucket: this.s3Bucket, Key: key }),
+    );
+    const bytes = await result.Body.transformToByteArray();
+
+    return {
+      body: Buffer.from(bytes),
+      contentType: result.ContentType || 'application/octet-stream',
+      contentLength: result.ContentLength,
+      etag: result.ETag,
+    };
+  }
+
   async delete(key) {
-    if (!this.supabase) {
-      throw new Error('Supabase Storage is not configured');
+    if (!this.provider) throw new Error('Storage is not configured');
+
+    if (this.provider === 's3') {
+      await this.s3.send(new DeleteObjectCommand({ Bucket: this.s3Bucket, Key: key }));
+      return { message: 'File deleted', key };
     }
 
     const { error } = await this.supabase.storage.from(this.bucket).remove([key]);
-
-    if (error) {
-      logger.error('Delete failed', {
-        context: 'StorageService',
-        data: { key, error: error.message },
-      });
-      throw new Error(`File deletion failed: ${error.message}`);
-    }
-
-    logger.info('File deleted', {
-      context: 'StorageService',
-      data: { key },
-    });
-
+    if (error) throw new Error(`File deletion failed: ${error.message}`);
     return { message: 'File deleted', key };
   }
 
-  /**
-   * List files in a folder
-   *
-   * @param {string} folder - Folder path
-   * @returns {Promise<Array>}
-   */
   async listFiles(folder = '') {
-    if (!this.supabase) {
-      throw new Error('Supabase Storage is not configured');
+    if (!this.provider) throw new Error('Storage is not configured');
+
+    if (this.provider === 's3') {
+      const prefix = folder ? `${folder.replace(/\/$/, '')}/` : '';
+      const result = await this.s3.send(
+        new ListObjectsV2Command({ Bucket: this.s3Bucket, Prefix: prefix, MaxKeys: 100 }),
+      );
+
+      return (result.Contents || [])
+        .sort((a, b) => (b.LastModified?.getTime() || 0) - (a.LastModified?.getTime() || 0))
+        .map((file) => ({
+          name: file.Key.slice(prefix.length),
+          key: file.Key,
+          url: this.getFileUrl(file.Key),
+          size: file.Size,
+          createdAt: file.LastModified,
+        }));
     }
 
     const { data, error } = await this.supabase.storage
       .from(this.bucket)
       .list(folder, { limit: 100, sortBy: { column: 'created_at', order: 'desc' } });
-
-    if (error) {
-      throw new Error(`Failed to list files: ${error.message}`);
-    }
+    if (error) throw new Error(`Failed to list files: ${error.message}`);
 
     return (data || []).map((file) => ({
       name: file.name,

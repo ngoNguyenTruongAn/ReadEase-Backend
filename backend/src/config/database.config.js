@@ -10,6 +10,8 @@ const DATABASE_SCHEMA = {
   DB_NAME: Joi.string().default('readease'),
   DB_USER: Joi.string().default('readease_app'),
   DB_PASSWORD: Joi.string().required().description('PostgreSQL password'),
+  DB_SSL: Joi.boolean().default(false),
+  DB_SSL_REJECT_UNAUTHORIZED: Joi.boolean().default(true),
 };
 
 const databaseConfig = () => ({
@@ -20,6 +22,10 @@ const databaseConfig = () => ({
     name: process.env.DB_NAME || 'readease',
     username: process.env.DB_USER || 'readease_app',
     password: process.env.DB_PASSWORD,
+    ssl: process.env.DB_SSL === 'true' || process.env.DB_SSL === '1',
+    sslRejectUnauthorized:
+      process.env.DB_SSL_REJECT_UNAUTHORIZED !== 'false' &&
+      process.env.DB_SSL_REJECT_UNAUTHORIZED !== '0',
     synchronize: false,
     logging: process.env.APP_ENV === 'development',
   },

@@ -1,7 +1,7 @@
 /**
  * Upload Controller
  *
- * REST API for file upload/delete/list via Supabase Storage.
+ * REST API for file upload/delete/list via the configured storage provider.
  *
  * Endpoints:
  *   POST   /api/v1/upload          — Upload file (multipart/form-data)
@@ -19,6 +19,8 @@ const {
   Delete,
   Req,
   Param,
+  Query,
+  Res,
   Body,
   UseGuards,
   UseInterceptors,
@@ -163,12 +165,39 @@ class UploadController {
       data: result,
     };
   }
+
+  async downloadFile(key, res) {
+    if (!key || key.includes('..')) {
+      throw new BadRequestException('Invalid file key');
+    }
+
+    const file = await this.storageService.download(key);
+    res.setHeader('Content-Type', file.contentType);
+    res.setHeader('Content-Length', String(file.contentLength || file.body.length));
+    res.setHeader('Cache-Control', 'private, max-age=300');
+    if (file.etag) res.setHeader('ETag', file.etag);
+    return res.send(file.body);
+  }
 }
 
 // ── NestJS Decorators (JavaScript style) ──
 
 Controller('api/v1/upload')(UploadController);
 Inject(StorageService)(UploadController, undefined, 0);
+
+// GET /api/v1/upload/file/content?key=... - Proxy a private S3 object to the browser.
+const downloadFileDescriptor = Object.getOwnPropertyDescriptor(
+  UploadController.prototype,
+  'downloadFile',
+);
+Reflect.decorate(
+  [Get('file/content')],
+  UploadController.prototype,
+  'downloadFile',
+  downloadFileDescriptor,
+);
+Query('key')(UploadController.prototype, 'downloadFile', 0);
+Res()(UploadController.prototype, 'downloadFile', 1);
 
 // POST /api/v1/upload — Single file
 const uploadFileDescriptor = Object.getOwnPropertyDescriptor(

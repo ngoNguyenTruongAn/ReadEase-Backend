@@ -14,6 +14,14 @@ const AppDataSource = new DataSource({
   username: process.env.DB_USER || 'readease_app',
   password: process.env.DB_PASSWORD || 'devpassword',
   database: process.env.DB_NAME || 'readease',
+  ssl:
+    process.env.DB_SSL === 'true' || process.env.DB_SSL === '1'
+      ? {
+          rejectUnauthorized:
+            process.env.DB_SSL_REJECT_UNAUTHORIZED !== 'false' &&
+            process.env.DB_SSL_REJECT_UNAUTHORIZED !== '0',
+        }
+      : false,
   migrations: [path.join(__dirname, 'migrations', '*.js')],
   logging: process.env.APP_ENV === 'development',
 });

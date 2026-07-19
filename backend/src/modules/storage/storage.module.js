@@ -1,7 +1,7 @@
 /**
  * Storage Module
  *
- * Provides Supabase Storage integration via StorageService.
+ * Provides S3 storage integration via StorageService, with Supabase fallback.
  * Exports StorageService for use in other modules.
  */
 

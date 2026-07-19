@@ -1,0 +1,27 @@
+aws_region   = "ap-southeast-1"
+project_name = "readease"
+environment  = "demo"
+frontend_image_tag = "latest"
+backend_image_tag  = "latest"
+ml_image_tag       = "latest"
+deploy_services = false
+
+db_instance_class       = "db.t4g.micro"
+db_allocated_storage    = 20
+skip_final_db_snapshot  = true
+force_delete_ecr        = false
+log_retention_days      = 7
+
+# Do not commit real values. terraform.tfvars is ignored by Git.
+# These values are stored in Terraform state; secure the state file.
+application_secrets = {
+  SUPABASE_URL         = "https://your-project.supabase.co"
+  SUPABASE_SERVICE_KEY = "replace-me"
+  SUPABASE_BUCKET      = "media"
+  GEMINI_API_KEY       = "replace-me"
+  SMTP_HOST            = "smtp.example.com"
+  SMTP_PORT            = "587"
+  SMTP_USER            = "replace-me"
+  SMTP_PASSWORD        = "replace-me"
+  SMTP_FROM            = "ReadEase <noreply@example.com>"
+}
