@@ -55,3 +55,7 @@ output "rds_master_secret_arn" {
 output "media_bucket_name" {
   value = aws_s3_bucket.media.bucket
 }
+
+output "github_actions_deploy_role_arn" {
+  value = aws_iam_role.github_actions_deploy.arn
+}

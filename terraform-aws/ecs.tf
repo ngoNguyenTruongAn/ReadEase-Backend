@@ -234,6 +234,11 @@ resource "aws_ecs_service" "backend" {
     container_port   = 3000
   }
 
+  lifecycle {
+    # GitHub Actions owns application task-definition revisions after bootstrap.
+    ignore_changes = [task_definition]
+  }
+
   depends_on = [
     aws_lb_listener_rule.api,
     aws_lb_listener_rule.tracking,

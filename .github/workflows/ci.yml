@@ -6,16 +6,15 @@ on:
   pull_request:
     branches: ["main", "develop"]
 
+permissions:
+  contents: read
+
 jobs:
-  # ──────────────────────────────────────────────
-  # Stage 1: Test & Lint (Backend + ML-Service)
-  # ──────────────────────────────────────────────
   test:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
 
-      # ── Backend Tests ──
       - name: Setup Node.js 22
         uses: actions/setup-node@v4
         with:
@@ -23,16 +22,18 @@ jobs:
           cache: "npm"
           cache-dependency-path: backend/package-lock.json
 
-      - name: Install Backend Dependencies
-        run: cd backend && npm ci
+      - name: Install backend dependencies
+        working-directory: backend
+        run: npm ci
 
-      - name: Lint Backend
-        run: cd backend && npm run lint
+      - name: Lint backend
+        working-directory: backend
+        run: npm run lint
 
-      - name: Run Backend Unit Tests
-        run: cd backend && npm test
+      - name: Run backend unit tests
+        working-directory: backend
+        run: npm test -- --runInBand
 
-      # ── ML-Service Tests ──
       - name: Setup Python 3.11
         uses: actions/setup-python@v5
         with:
@@ -40,45 +41,139 @@ jobs:
           cache: "pip"
           cache-dependency-path: ml-service/requirements.txt
 
-      - name: Install ML Dependencies
-        run: cd ml-service && pip install -r requirements.txt
+      - name: Install ML dependencies
+        working-directory: ml-service
+        run: pip install -r requirements.txt
 
-      - name: Run ML-Service Tests
-        run: cd ml-service && python -m pytest --tb=short
+      - name: Run ML service tests
+        working-directory: ml-service
+        run: python -m pytest --tb=short
 
-  # ──────────────────────────────────────────────
-  # Stage 2: Deploy to VPS (only on push to main)
-  # ──────────────────────────────────────────────
   deploy:
     needs: test
     runs-on: ubuntu-latest
     if: github.ref == 'refs/heads/main' && github.event_name == 'push'
+    concurrency:
+      group: readease-production
+      cancel-in-progress: false
+    permissions:
+      contents: read
+      id-token: write
+    env:
+      AWS_REGION: ap-southeast-1
+      ECS_CLUSTER: readease-demo-cluster
+      ECS_SERVICE: readease-demo-backend
+      TASK_FAMILY: readease-demo-backend
+      APPLICATION_URL: http://readease-demo-alb-1388515170.ap-southeast-1.elb.amazonaws.com
     steps:
-      - name: Deploy to VPS via SSH
-        uses: appleboy/ssh-action@v1
+      - uses: actions/checkout@v4
+
+      - name: Configure AWS credentials with GitHub OIDC
+        uses: aws-actions/configure-aws-credentials@v4
         with:
-          host: ${{ secrets.VPS_HOST }}
-          username: ${{ secrets.VPS_USER }}
-          key: ${{ secrets.VPS_SSH_KEY }}
-          script: |
-            cd ${{ secrets.VPS_DEPLOY_PATH || '/opt/readease' }}
+          role-to-assume: arn:aws:iam::193229476041:role/readease-demo-github-actions-deploy
+          aws-region: ${{ env.AWS_REGION }}
 
-            # Pull latest code
-            git pull origin main
+      - name: Login to Amazon ECR
+        id: ecr
+        uses: aws-actions/amazon-ecr-login@v2
 
-            # Rebuild and restart containers
-            docker compose -f docker-compose.prod.yml up -d --build --remove-orphans
+      - name: Build and push immutable images
+        id: images
+        env:
+          REGISTRY: ${{ steps.ecr.outputs.registry }}
+        run: |
+          BACKEND_IMAGE="$REGISTRY/readease-demo-backend:${GITHUB_SHA}"
+          ML_IMAGE="$REGISTRY/readease-demo-ml:${GITHUB_SHA}"
 
-            # Run database migrations inside the api container
-            docker exec readease_api node -e "
-              const ds = require('./src/database/data-source.js');
-              ds.initialize().then(d => d.runMigrations().then(() => {
-                console.log('Migrations completed');
-                process.exit(0);
-              })).catch(e => { console.error(e); process.exit(1); });
-            "
+          docker build -t "$BACKEND_IMAGE" ./backend
+          docker push "$BACKEND_IMAGE"
 
-            # Verify health
-            sleep 10
-            curl -f http://localhost:3000/api/v1/health || exit 1
-            echo "✅ Deploy successful!"
+          docker build -t "$ML_IMAGE" ./ml-service
+          docker push "$ML_IMAGE"
+
+          echo "backend=$BACKEND_IMAGE" >> "$GITHUB_OUTPUT"
+          echo "ml=$ML_IMAGE" >> "$GITHUB_OUTPUT"
+
+      - name: Register a new backend task definition
+        id: task-definition
+        env:
+          BACKEND_IMAGE: ${{ steps.images.outputs.backend }}
+          ML_IMAGE: ${{ steps.images.outputs.ml }}
+        run: |
+          aws ecs describe-task-definition \
+            --task-definition "$TASK_FAMILY" \
+            --query taskDefinition > current-task-definition.json
+
+          jq --arg backend "$BACKEND_IMAGE" --arg ml "$ML_IMAGE" '
+            .containerDefinitions |= map(
+              if .name == "backend" then .image = $backend
+              elif .name == "ml" then .image = $ml
+              else . end
+            )
+            | del(
+                .taskDefinitionArn,
+                .revision,
+                .status,
+                .requiresAttributes,
+                .compatibilities,
+                .registeredAt,
+                .registeredBy,
+                .deregisteredAt
+              )
+          ' current-task-definition.json > next-task-definition.json
+
+          TASK_DEFINITION_ARN=$(aws ecs register-task-definition \
+            --cli-input-json file://next-task-definition.json \
+            --query taskDefinition.taskDefinitionArn \
+            --output text)
+          echo "arn=$TASK_DEFINITION_ARN" >> "$GITHUB_OUTPUT"
+
+      - name: Run database migrations
+        env:
+          TASK_DEFINITION_ARN: ${{ steps.task-definition.outputs.arn }}
+        run: |
+          NETWORK_CONFIGURATION=$(aws ecs describe-services \
+            --cluster "$ECS_CLUSTER" \
+            --services "$ECS_SERVICE" \
+            --query 'services[0].networkConfiguration' \
+            --output json)
+
+          MIGRATION_TASK_ARN=$(aws ecs run-task \
+            --cluster "$ECS_CLUSTER" \
+            --launch-type FARGATE \
+            --task-definition "$TASK_DEFINITION_ARN" \
+            --network-configuration "$NETWORK_CONFIGURATION" \
+            --overrides '{"containerOverrides":[{"name":"backend","command":["npm","run","migration:run"]}]}' \
+            --query 'tasks[0].taskArn' \
+            --output text)
+
+          test "$MIGRATION_TASK_ARN" != "None"
+          aws ecs wait tasks-stopped --cluster "$ECS_CLUSTER" --tasks "$MIGRATION_TASK_ARN"
+
+          EXIT_CODE=$(aws ecs describe-tasks \
+            --cluster "$ECS_CLUSTER" \
+            --tasks "$MIGRATION_TASK_ARN" \
+            --query "tasks[0].containers[?name=='backend'].exitCode | [0]" \
+            --output text)
+          test "$EXIT_CODE" = "0"
+
+      - name: Deploy backend service
+        env:
+          TASK_DEFINITION_ARN: ${{ steps.task-definition.outputs.arn }}
+        run: |
+          aws ecs update-service \
+            --cluster "$ECS_CLUSTER" \
+            --service "$ECS_SERVICE" \
+            --task-definition "$TASK_DEFINITION_ARN" \
+            --force-new-deployment > /dev/null
+
+          aws ecs wait services-stable \
+            --cluster "$ECS_CLUSTER" \
+            --services "$ECS_SERVICE"
+
+      - name: Verify deployment
+        run: |
+          curl --fail --silent --show-error \
+            --retry 12 --retry-delay 5 \
+            "$APPLICATION_URL/api/v1/health"
